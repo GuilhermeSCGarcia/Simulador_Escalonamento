@@ -9,7 +9,7 @@ class CarregarConfig:
                      "quantum": 2,
                      "qtde_cpus": 4
                     }
-        self.listTarefas = [] 
+        self.listTarefas = [] #lista que vai armazenar um dicionário com as tarefas que virá do arquivo txt
 
     def carregarArquivoTXT(self,caminho: str): #função para abrir o arquivo e salvar na variavel da classe
         try:
@@ -36,22 +36,13 @@ class CarregarConfig:
                             "cor": conteudo[1],
                             "ingresso": int(conteudo[2]),
                             "duracao": int(conteudo[3]),
-                            "listaEvent": conteudo[4]}
+                            "prioridade": int(conteudo[4]),
+                            "listaEvent": conteudo[5]}
                     self.listTarefas.append(tarefa)
         
-    
+    def getConfigSim(self) -> dict: #getter das configurações gerais do simulador
+        return self.configSim
+    def getlistaTarefas(self) -> list: #getter da lista de tarefas
+        return self.listTarefas
             
-#teste
-'''
-def main():
-    objcarregar = CarregarConfig()
-    print(objcarregar.carregarArquivoTXT("config.txt"))
-    objcarregar.carregarParametros()
-    print(objcarregar.listTarefas)
-    print(objcarregar.configSim)
-    
-if __name__ == "__main__":
-    main()
-    
-'''
     
