@@ -1,7 +1,6 @@
 from Estados import EstadosTarefa
 from dataclasses import dataclass, field
 
-
 @dataclass
 class TCB:
     
@@ -16,13 +15,3 @@ class TCB:
     idCpu: int = -1 #cpu associada com o processo
     listaEvento : list[int] = field(default_factory=list) #guarda uma lista de evento para o projeto B
     historico: list[tuple[int,int,EstadosTarefa]] = field(default_factory=list) # guarda o histórico de tempo e o estado da tarefa(inicio,fim,qual_estado)
-    
-
-
-    
-    
-
-
-
-
-    

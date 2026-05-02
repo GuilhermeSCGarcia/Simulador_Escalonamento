@@ -1,5 +1,7 @@
+from TCB import TCB
+
 class CarregarConfig:
-    f : object
+    f: object
     configSim: dict
     listTarefas : list
     
@@ -9,7 +11,7 @@ class CarregarConfig:
                      "quantum": 2,
                      "qtde_cpus": 4
                     }
-        self.listTarefas = [] #lista que vai armazenar um dicionário com as tarefas que virá do arquivo txt
+        self.listTarefas = [] 
 
     def carregarArquivoTXT(self,caminho: str): #função para abrir o arquivo e salvar na variavel da classe
         try:
@@ -32,17 +34,26 @@ class CarregarConfig:
                                             "qtde_cpus": int(conteudo[2])})
                 else:
                     conteudo = linhas.split(";") #configuraçao das tarefas
-                    tarefa = {"id": int(conteudo[0]),
-                            "cor": conteudo[1],
-                            "ingresso": int(conteudo[2]),
-                            "duracao": int(conteudo[3]),
-                            "prioridade": int(conteudo[4]),
-                            "listaEvent": conteudo[5]}
+                    tarefa = TCB(
+                        id = int(conteudo[0]),
+                        temp_chegada = int(conteudo[1]),
+                        temp_total = int(conteudo[2]),
+                        temp_corrido = int(conteudo[3]),
+                        prioridade_estatica = int(conteudo[4]),
+                        listaEvento = conteudo[5]
+                    )
                     self.listTarefas.append(tarefa)
-        
-    def getConfigSim(self) -> dict: #getter das configurações gerais do simulador
-        return self.configSim
-    def getlistaTarefas(self) -> list: #getter da lista de tarefas
-        return self.listTarefas
-            
+
+#teste
+'''
+def main():
+    objcarregar = CarregarConfig()
+    print(objcarregar.carregarArquivoTXT("config.txt"))
+    objcarregar.carregarParametros()
+    print(objcarregar.listTarefas)
+    print(objcarregar.configSim)
     
+if __name__ == "__main__":
+    main()
+    
+'''

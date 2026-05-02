@@ -10,8 +10,7 @@ def main():
     
     print(cpu1.id)
     
-    cpu1.historico(0,3,EstadosCPU.ativo)
-    
+    cpu1.historico(0,3,EstadosCPU.ativo)    
     
 if __name__ == "__main__":
     main()
