@@ -36,13 +36,20 @@ class CarregarConfig:
                     conteudo = linhas.split(";") #configuraçao das tarefas
                     tarefa = TCB(
                         id = int(conteudo[0]),
-                        temp_chegada = int(conteudo[1]),
-                        temp_total = int(conteudo[2]),
-                        temp_corrido = int(conteudo[3]),
-                        prioridade_estatica = int(conteudo[4]),
-                        listaEvento = conteudo[5]
+                        cor = conteudo[1],                        
+                        tempoDeIngresso = int(conteudo[2]),     
+                        tempoTotal = int(conteudo[3]),           
+                        tempoCorrido = int(conteudo[3]),         
+                        prioridadeEstatica = int(conteudo[4]),    
+                        listaEvento = conteudo[5]                
                     )
                     self.listTarefas.append(tarefa)
+
+    def getConfigSim(self) -> dict: # Método que retorna as configurações do simulador
+        return self.configSim
+        
+    def getlistaTarefas(self) -> list: # Método que retornar a lista de tarefas
+        return self.listTarefas
 
 #teste
 '''

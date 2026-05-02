@@ -23,17 +23,7 @@ class SimuladorConfig:
         self.criarCPUS()  #método para criar a lista de cpu's iniciais
         
     def carregarTarefas(self,listaTarefas: list): # método para carregar as tarefas, para cada tarefa atribui-se uma TCB
-        for tarefas in listaTarefas:
-            taf = TCB(
-                tempoDeIngresso= tarefas["ingresso"],
-                tempoTotal= tarefas["duracao"],
-                tempCorrido= tarefas["duracao"],
-                prioridadeEstatica= tarefas["prioridade"],
-                id=tarefas["id"],
-                cor=tarefas["cor"],
-                estado= EstadosTarefa.NOVO
-            )
-            self.listaTarefasCarregadas.append(taf)   
+        self.listaTarefasCarregadas = listaTarefas.copy()  
                    
     def criarCPUS(self): # método para criar a lista das cpus do sistema, levando em consideração o quantidade de cpus passada na configuração no txt
         i = 0

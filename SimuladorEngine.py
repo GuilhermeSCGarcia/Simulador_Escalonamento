@@ -1,5 +1,10 @@
+import random
+
 from SimuladorConfig import SimuladorConfig
 from SimuladorEstado import SimuladorEstado
+from TCB import TCB
+from Estados import EstadosTarefa
+from CPU import CPU
 
 class SimuladorEngine:
     config : SimuladorConfig # Configuração do sistema
@@ -19,14 +24,58 @@ class SimuladorEngine:
     def processar_cpus(self) -> None: # Método que verifica todas as tarefas da cpu, diminui o tempo delas e verifica se elas finalizaram
         for cpu in self.estado_atual.cpus:
             if cpu.atualTarefa is not None:
-                cpu.atualTarefa.tempCorrido = cpu.atualTarefa.tempCorrido - 1
+                cpu.atualTarefa.tempoCorrido = cpu.atualTarefa.tempoCorrido - 1
 
-                if cpu.atualTarefa.tempCorrido == 0: # Verifica se a tarefa finalizou
+                if cpu.atualTarefa.tempoCorrido == 0: # Verifica se a tarefa finalizou
                     self.estado_atual.finalizar_tarefa(cpu.atualTarefa, cpu)
+ 
+    def chamar_escalonador(self) -> None: # Método para definir quais tarefas vão rodar em cada cpu
+        candidatos: list[TCB] = []
 
-    def chamar_escalonador(self) -> None:
-        # To Do
-        print("Teste")
+        for tarefa_pronta in self.estado_atual.fila_prontos: # Pega todas as tarefas da filas de pronto
+            tarefa_pronta.estavaRodando = False # Atributo temporário para desempate
+            candidatos.append(tarefa_pronta)
+        
+        for cpu in self.estado_atual.cpus: # Pega todas as tarefas rodando em cada cpu
+            if cpu.atualTarefa is not None:
+                cpu.atualTarefa.estavaRodando = True # Atributo temporário para desempate
+                candidatos.append(cpu.atualTarefa)
+                cpu.atualTarefa = None
+
+        if not candidatos: # Se não houver nenhum candido só retornar
+            return
+        
+        if self.config.algoritmoEscalomento == "SRTF": # Ordena a lita de candidados conforme parâmetros de desampate do algoritmo SRTF
+            candidatos.sort(key=lambda t: (
+                t.tempoCorrido,
+                not t.estavaRodando,
+                t.tempoDeIngresso,
+                t.tempoTotal,
+                random.random()
+            ))
+
+        elif self.config.algoritmoEscalomento == "PRIOP": # Ordena a lita de candidados conforme parâmetros de desampate do algoritmo PRIOP
+            candidatos.sort(key=lambda t: (
+                -t.prioridadeEstatica,
+                not t.estavaRodando,
+                t.tempoDeIngresso,
+                t.tempoTotal,
+                random.random()
+            ))
+
+        self.estado_atual.fila_prontos.clear()
+
+        for candidato in candidatos:
+            cpu_livre: CPU = next((c for c in self.estado_atual.cpus if c.atualTarefa is None), None) # Procura primeira CPU livre
+
+            if cpu_livre is not None:
+                # A tarefa do topo da lista de candidatos foi selecionada para essa cpu
+                cpu_livre.atualTarefa = candidato
+                candidato.estado = EstadosTarefa.EXECUTANDO
+            else:
+                # Não tem mais vaga, o candidato volta para a fila de prontos
+                self.estado_atual.fila_prontos.append(candidato)
+                candidato.estado = EstadosTarefa.PRONTO
 
     def avancar_tick(self) -> None: # Método que controla o fluxo de avançar o tempo do sistema
         self.historico_estados.append(self.estado_atual.clonar_estado())
