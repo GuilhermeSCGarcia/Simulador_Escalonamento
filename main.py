@@ -1,16 +1,15 @@
-from CPU import CPU
-from Estados import EstadosCPU, EstadosTarefa
+import tkinter as tk
+from Interface import InterfaceSimulador
 
 def main():
-    cpu1 = CPU(
-        id = 1,
-        estado = EstadosCPU.LIGADO,
-        atualTarefa = None,
-    )
+    # 1. Cria a janela raiz do sistema operacional
+    root = tk.Tk()
+
+    # 2. Instancia a interface
+    app = InterfaceSimulador(root)
     
-    print(cpu1.id)
-    
-    cpu1.historico(0,3,EstadosCPU.ativo)    
-    
+    # 3. Roda o loop principal
+    root.mainloop()
+
 if __name__ == "__main__":
     main()
