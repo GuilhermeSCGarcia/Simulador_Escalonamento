@@ -4,7 +4,7 @@ from Estados import EstadosTarefa
 from CPU import CPU
 
 #Essa classe carrega as configurações iniciais do simulador, usa a classe CarregarConfig, que lê o arquivo de texto
-class ConfigSimulador:
+class SimuladorConfig:
     algoritmoEscalomento : str #algoritmo escolhido
     quantum: int #duração do quantum
     qtde_cpus: int #quantidade de cpus

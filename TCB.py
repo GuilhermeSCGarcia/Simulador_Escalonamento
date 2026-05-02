@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 
 @dataclass
 class TCB:
-    
     tempoDeIngresso: int #tempo de tick de chegada da tarefa
     tempoTotal: int #tempo total da tarefa
     tempCorrido: int #tempo restante até a tarefa terminar
