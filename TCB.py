@@ -15,3 +15,4 @@ class TCB:
     listaEvento : list[int] = field(default_factory=list) #guarda uma lista de evento para o projeto B
     historico: list[tuple[int,int,EstadosTarefa]] = field(default_factory=list) # guarda o histórico de tempo e o estado da tarefa(inicio,fim,qual_estado)
     estavaRodando: bool = False # Atributo para desempate no escalonamento
+    sofreu_sorteio: bool = False # Atributo para determinar se a tarefa foi escolhida com base no sorteio

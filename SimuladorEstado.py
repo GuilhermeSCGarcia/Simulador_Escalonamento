@@ -9,6 +9,7 @@ class SimuladorEstado:
     relogio_global: int = 0 # Relógio do sistema
     cpus: list[CPU] # Lista de CPUs
     fila_prontos: list[TCB] # Lista da fila da tarefas prontas para execução 
+    fila_suspensas: list[TCB] # Lista da fila de tarefas suspensas
     tarefas_futuras: list[TCB] # Lista de tarefas futuras
     tarefas_finalizadas: list[TCB] # Lista de tarefas finalizadas
 
@@ -18,6 +19,7 @@ class SimuladorEstado:
         self.cpus = copy.deepcopy(lista_cpus) # Recebe lista de cpus criada pelo SimuladorConfig
         self.tarefas_futuras = copy.deepcopy(lista_tarefas_carregadas) # Recebe lista de tarefas carregadas, que vão para a lista de futuras, criadas pelo Simulador Config
         self.fila_prontos = [] # Inicia fila de prontos vazia
+        self.fila_suspensas = [] # Inicia fila de tarefas suspensas vazia
         self.tarefas_finalizadas = [] # Inicia fila de tarefas finalizadas vazia
 
     def simulacao_finalizada(self) -> bool: # Método que retorna se a simulacao está finalizada
@@ -51,5 +53,5 @@ class SimuladorEstado:
         self.tarefas_finalizadas.append(tarefa)
         tarefa.estado = EstadosTarefa.FINALIZADO
 
-    def clonar_estado(self) -> 'SimuladorEstado': # Método que retorna uma cópia profunda desse estado, ajuuda no histórico
+    def clonar_estado(self) -> SimuladorEstado: # Método que retorna uma cópia profunda desse estado, ajuuda no histórico
         return copy.deepcopy(self)
