@@ -1,9 +1,20 @@
 from TCB import TCB
 
+CORES_SUGESTAO = [
+    "FF6B6B",  # vermelho suave
+    "4ECDC4",  # verde-água
+    "45B7D1",  # azul
+    "F7B801",  # amarelo
+    "A29BFE",  # roxo
+    "FF8C42",  # laranja
+    "2ECC71",  # verde
+    "E84393",  # rosa
+]
+
 class CarregarConfig:
     f: object
     configSim: dict
-    listTarefas : list
+    listTarefas : list[TCB]
     
     def __init__(self):
         self.f = None
@@ -29,38 +40,66 @@ class CarregarConfig:
             if linhas: #testa a linha para ver se não é vazia
                 if i == 0:
                     conteudo = linhas.split(";") #faz uma lista com os elementos 
-                    self.configSim.update({"algoritmo_escalonamento" : conteudo[0].upper(), #configuração da simulação
-                                           "quantum": int(conteudo[1]),
-                                            "qtde_cpus": int(conteudo[2])})
+                    self.configSim.update({"algoritmo_escalonamento" : "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
+                                           "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
+                                            "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])})
                 else:
                     conteudo = linhas.split(";") #configuraçao das tarefas
                     tarefa = TCB(
-                        id = int(conteudo[0]),
+                        id = -1 if conteudo[0] == "" else int(conteudo[0]),
                         cor = conteudo[1],                        
-                        tempoDeIngresso = int(conteudo[2]),     
-                        tempoTotal = int(conteudo[3]),           
-                        tempoCorrido = int(conteudo[3]),         
-                        prioridadeEstatica = int(conteudo[4]),    
-                        listaEvento = conteudo[5]                
+                        tempoDeIngresso = -1 if conteudo[2] == "" else int(conteudo[2]),     
+                        tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
+                        tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
+                        prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
+                        listaEvento = conteudo[5]               
                     )
                     self.listTarefas.append(tarefa)
+        self.checarParametros(self.listTarefas) #chama a função para checar os parametros das tarefas e preencher os vazios
+        
 
     def getConfigSim(self) -> dict: # Método que retorna as configurações do simulador
         return self.configSim
         
     def getlistaTarefas(self) -> list: # Método que retornar a lista de tarefas
         return self.listTarefas
+    
+    def checarParametros(self, T: list[TCB]):
+        l_id: list[int] = []
+        l_cor: list[str] = []
+        for t in T:
+            l_id.append(t.id)
+            l_cor.append(t.cor)
+        for t in T:
+            if t.id == -1:
+                t.id = max(l_id) + 1
+                l_id.append(t.id)
+            if t.cor == "":
+                for cor in CORES_SUGESTAO:
+                    if cor not in l_cor:
+                        t.cor = cor
+                        l_cor.append(cor)
+                        break
+            if t.tempoDeIngresso == -1:
+                t.tempoDeIngresso = 0
+            if t.tempoTotal == -1:
+                t.tempoTotal = 10
+                t.tempoCorrido = 10
+            if t.prioridadeEstatica == -1:
+                t.prioridadeEstatica = 5
+            
+
+        
+
 
 #teste
-'''
+
 def main():
     objcarregar = CarregarConfig()
-    print(objcarregar.carregarArquivoTXT("config.txt"))
+    print(objcarregar.carregarArquivoTXT("config2.txt"))
     objcarregar.carregarParametros()
     print(objcarregar.listTarefas)
-    print(objcarregar.configSim)
     
 if __name__ == "__main__":
     main()
     
-'''

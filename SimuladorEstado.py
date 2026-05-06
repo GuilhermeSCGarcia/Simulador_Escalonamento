@@ -1,4 +1,6 @@
+from __future__ import annotations
 import copy
+
 
 from TCB import TCB
 from CPU import CPU
