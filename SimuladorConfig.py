@@ -8,10 +8,10 @@ class SimuladorConfig:
     algoritmoEscalomento : str #algoritmo escolhido
     quantum: int #duração do quantum
     qtde_cpus: int #quantidade de cpus
-    listaTarefasCarregadas: list = [] #lista de tarefas carregadas, representa o estado inicial das tarefas
-    listaCPU: list = [] #lista das cpus criadas, representa o estado inicial das cpus
 
     def __init__(self,txt: str):
+        self.listaTarefasCarregadas = [] #lista de tarefas carregadas que sera usada pelo SimuladorEstado
+        self.listaCPU = [] #lista de cpus que sera usado pelo SimuladorEstado
         configParse = CarregarConfig() #cria um objeto que lê o arquivo txt
         print(configParse.carregarArquivoTXT(txt)) #um print para saber se o arquivo foi lido com sucesso
         configParse.carregarParametros() # método para ler o arquivo txt

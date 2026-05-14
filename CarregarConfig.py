@@ -35,27 +35,36 @@ class CarregarConfig:
     
     
     def carregarParametros(self): #função para fazer o parser do arquivo txt
-        for i, linhas in enumerate(self.f): #loop em todas as linhas do arquivo
-            linhas = linhas.strip() #remove espaços
-            if linhas: #testa a linha para ver se não é vazia
-                if i == 0:
-                    conteudo = linhas.split(";") #faz uma lista com os elementos 
-                    self.configSim.update({"algoritmo_escalonamento" : "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
-                                           "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
-                                            "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])})
-                else:
-                    conteudo = linhas.split(";") #configuraçao das tarefas
-                    tarefa = TCB(
-                        id = -1 if conteudo[0] == "" else int(conteudo[0]),
-                        cor = conteudo[1],                        
-                        tempoDeIngresso = -1 if conteudo[2] == "" else int(conteudo[2]),     
-                        tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
-                        tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
-                        prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
-                        listaEvento = conteudo[5]               
-                    )
-                    self.listTarefas.append(tarefa)
-        self.checarParametros(self.listTarefas) #chama a função para checar os parametros das tarefas e preencher os vazios
+        try:
+            for i, linhas in enumerate(self.f): #loop em todas as linhas do arquivo
+                linhas = linhas.strip() #remove espaços
+                if linhas: #testa a linha para ver se não é vazia
+                    if i == 0:
+                        conteudo = linhas.split(";") #faz uma lista com os elementos 
+                        self.configSim.update({"algoritmo_escalonamento" : "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
+                                            "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
+                                                "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])})
+                    else:
+                        conteudo = linhas.split(";") #configuraçao das tarefas
+                        tarefa = TCB(
+                            id = -1 if conteudo[0] == "" else int(conteudo[0]),
+                            cor = conteudo[1],                        
+                            tempoDeIngresso = -1 if conteudo[2] == "" else int(conteudo[2]),     
+                            tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
+                            tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
+                            prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
+                            listaEvento = conteudo[5]               
+                        )
+                        self.listTarefas.append(tarefa)
+            self.checarParametros(self.listTarefas) #chama a função para checar os parametros das tarefas e preencher os vazios
+        except Exception as e:
+            print(f"Erro ao carregar parâmetros: {e}")
+
+        # Fecha o arquivo após o parse para evitar vazamento de descritor
+        try:
+            self.f.close()
+        except Exception:
+            pass
         
 
     def getConfigSim(self) -> dict: # Método que retorna as configurações do simulador

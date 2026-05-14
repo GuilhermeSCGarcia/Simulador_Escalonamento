@@ -1,0 +1,32 @@
+t: tarefa
+p: processador
+
+lp : lista de tarefas prontas
+lf : lista de tarefas futuras
+le : lista de tarefas finalizadas(end)
+
+ESCALONADOR: retorna uma tarefa escolhida
+
+INICIO
+    para cada t em tf onde t.incio = 0, lp(t)
+    para cada p sem t, chamar o ESCALONADOR
+    para t escolhida, muda o estado para EXECUÇÃO
+AVANÇAR_TICK
+    para cada t que ingressou no sistema:
+        para cada p no sistema:
+            chamar o ESCALONADOR para processador p
+        se t não for selecionada lp(t)
+    para cada p:
+        diminiui o quantum atual de
+        diminui o a duração de p.t
+        se p.t ou t.duração forem iguais a 0:
+            se t.duraçao == 0:
+                mude o estado de t para Finalizado
+                faça le(t)
+                faça p.t = vazio (sem tarefas)
+            chamar ESCALONADOR para o processador p
+        senão:
+            diminiui o quantum de t e a duração de p.t
+    avaçar relogio total do sistema
+FIM
+    
