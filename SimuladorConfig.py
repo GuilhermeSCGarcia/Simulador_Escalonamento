@@ -22,8 +22,16 @@ class SimuladorConfig:
         self.carregarTarefas(configParse.getlistaTarefas()) #método para carregar a lista de tarefas inicias
         self.criarCPUS()  #método para criar a lista de cpu's iniciais
         
-    def carregarTarefas(self,listaTarefas: list): # método para carregar as tarefas, para cada tarefa atribui-se uma TCB
-        self.listaTarefasCarregadas = listaTarefas.copy()  
+    def carregarTarefas(self,listaTarefas: list): # método para carregar as tarefas, para cada tarefa atribui-se uma TCB. Verifica se existe id repetido
+        ids_vistos = set()
+        for tarefa in listaTarefas:
+            if tarefa.id in ids_vistos:
+                # Se o id já existir, lançar erro
+                raise ValueError("Arquivo inválido, id repetido")
+            ids_vistos.add(tarefa.id)
+
+        self.listaTarefasCarregadas = listaTarefas.copy()
+        
                    
     def criarCPUS(self): # método para criar a lista das cpus do sistema, levando em consideração o quantidade de cpus passada na configuração no txt
         i = 0

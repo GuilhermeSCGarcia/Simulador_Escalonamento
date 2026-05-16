@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.lines import Line2D 
@@ -8,6 +10,8 @@ from SimuladorConfig import SimuladorConfig
 from SimuladorEstado import SimuladorEstado
 from SimuladorEngine import SimuladorEngine
 from Estados import EstadosTarefa
+from Escalonadores import fabrica_de_escalonadores
+from TCB import TCB
 
 class InterfaceSimulador:
     def __init__(self, root):
@@ -34,9 +38,15 @@ class InterfaceSimulador:
         self.btn_carregar = tk.Button(self.frame_controles, text="Carregar config.txt", font=("Helvetica", 12), bg="#27AE60", fg="white", relief="flat", command=self.carregar_arquivo)
         self.btn_carregar.pack(fill=tk.X, pady=10)
         
-        #Mensagem para mostrar que não tem configuração carregada
+        # Mensagem para mostrar que não tem configuração carregada
         self.lbl_info = tk.Label(self.frame_controles, text="Nenhuma configuração carregada.", font=("Helvetica", 10), bg="#2C3E50", fg="#BDC3C7", justify=tk.LEFT)
         self.lbl_info.pack(anchor="w", pady=10)
+
+        # Mudar Algoritmo em Tempo de execução
+        tk.Label(self.frame_controles, text="Algoritmo Atual:", font=("Helvetica", 10, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(10, 0))
+        self.combo_algoritmo = ttk.Combobox(self.frame_controles, values=["SRTF", "PRIOP"], state="disabled")
+        self.combo_algoritmo.pack(fill=tk.X, pady=(2, 10))
+        self.combo_algoritmo.bind("<<ComboboxSelected>>", self.acao_mudar_algoritmo)
         
         #frame que contém o status do sistema
         self.frame_status = tk.Frame(self.frame_controles, bg="#34495E", padx=10, pady=10)
@@ -95,29 +105,53 @@ class InterfaceSimulador:
         
         tk.Label(self.frame_tabela, text="Editor de Tarefas (Dê um duplo clique em uma tarefa para editá-la)", font=("Helvetica", 10, "bold"), bg="white", fg="#2C3E50").pack(anchor="w", pady=(0,5))
 
-        #colunas para o nome das tabelas:
-        #id é o identificador da tarefa
-        #estado é o estado da tarefa no programa
-        #tempo restante é o tempo que falta para a tarefa finalizar
-        #tempo de ingresso é o tempo que ela entra no programa
+        # --- Botões para alternar a tabela ---
+        frame_abas = tk.Frame(self.frame_tabela, bg="white")
+        frame_abas.pack(fill=tk.X, pady=(0,5))
+        
+        self.btn_ver_tarefas = tk.Button(frame_abas, text="📊 Ver Tarefas", font=("Helvetica", 10), bg="#3498DB", fg="white", relief="flat", command=lambda: self.mudar_aba_tabela("Tarefas"))
+        self.btn_ver_tarefas.pack(side=tk.LEFT, padx=(0, 5))
 
-        colunas = ("ID", "Estado", "Tempo Restante", "Prioridade Estática", "Tempo de Ingresso") #colunas da tabelas
+        self.btn_ver_cpus = tk.Button(frame_abas, text="💻 Ver Uso das CPUs", font=("Helvetica", 10), bg="#95A5A6", fg="white", relief="flat", command=lambda: self.mudar_aba_tabela("CPUs"))
+        self.btn_ver_cpus.pack(side=tk.LEFT)
 
-        self.tree = ttk.Treeview(self.frame_tabela, columns=colunas, show='headings', height=5,selectmode="browse")   #configura a tabela indicando as colunas , com altura máxima de 5
+        # Controle de modo atual
+        self.modo_visualizacao = "Tarefas"
+
+        # Tabela base (sem as colunas fixas ainda, pois o método vai inseri-las)
+        self.tree = ttk.Treeview(self.frame_tabela, show='headings', height=5, selectmode="browse")   
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scroll_y = ttk.Scrollbar(self.frame_tabela, orient="vertical", command=self.tree.yview) 
+        self.tree.configure(yscrollcommand=scroll_y.set) 
+        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.tree.bind("<Double-1>", self.acao_editar_tarefa)
+        self.desenhar_gantt_vazio()
+        
+        # Chama a função para criar as colunas iniciais de Tarefas
+        self.mudar_aba_tabela("Tarefas")
+
+    def mudar_aba_tabela(self, modo):
+        self.modo_visualizacao = modo
+        if modo == "Tarefas":
+            self.btn_ver_tarefas.config(bg="#3498DB") # Fica azul
+            self.btn_ver_cpus.config(bg="#95A5A6")    # Fica cinza
+            colunas = ("ID", "Estado", "Tempo Restante", "Prioridade Estática", "Tempo de Ingresso")
+        else:
+            self.btn_ver_tarefas.config(bg="#95A5A6") # Fica cinza
+            self.btn_ver_cpus.config(bg="#3498DB")    # Fica azul
+            colunas = ("ID CPU", "Status Energia", "Tarefa Atual", "Uso (%)", "Quantum Atual")
+
+        # Configura as novas colunas
+        self.tree["columns"] = colunas
         for col in colunas:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="center")
-        # Empacota a tabela e a barra de rolagem lado a lado para que a rolagem funcione
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        scroll_y = ttk.Scrollbar(self.frame_tabela, orient="vertical", command=self.tree.yview) #barra para conseguir rolar as tarefas, caso elas passem de 5
-        self.tree.configure(yscrollcommand=scroll_y.set) #configuração da barra de rolagem
-        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Vincula o evento de duplo clique à função de edição
-        self.tree.bind("<Double-1>", self.acao_editar_tarefa)
-        #desenha o gráfico vazio 
-        self.desenhar_gantt_vazio()
+            
+        # Atualiza os dados se a engine já estiver carregada
+        if self.engine: 
+            self.atualizar_tela()
 
 
     def carregar_arquivo(self):
@@ -144,6 +178,10 @@ class InterfaceSimulador:
             #Atualiza as informações do painel lateral com os dados do arquivos carregado
             self.lbl_info.config(text=f"Algoritmo: {config.algoritmoEscalomento}\nCPUs: {config.qtde_cpus}\nTarefas carregadas: {len(config.listaTarefasCarregadas)}\nQuantum total: {config.quantum}")
             
+            # Destrava e seta o algoritmo atual ---
+            self.combo_algoritmo.config(state="readonly")
+            self.combo_algoritmo.set(config.algoritmoEscalomento.upper())
+
             #ativa os botões para funcionar apos carregar as configurações
             self.btn_avancar.config(state=tk.NORMAL)
             self.btn_retroceder.config(state=tk.NORMAL)
@@ -155,6 +193,17 @@ class InterfaceSimulador:
     
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao ler o arquivo:\n{str(e)}")
+
+    def acao_mudar_algoritmo(self):
+        if not self.engine: return
+        
+        novo_alg = self.combo_algoritmo.get()
+        # Atualiza a string no config (para o título do gráfico atualizar)
+        self.engine.config.algoritmoEscalomento = novo_alg
+        # Substitui a instância do escalonador em tempo real!
+        self.engine.escalonador = fabrica_de_escalonadores(novo_alg)
+        
+        self.atualizar_tela() # Atualiza para mudar o título do gráfico instantaneamente
 
     def acao_avancar(self):
         if self.engine.estado_atual.simulacao_finalizada():
@@ -192,6 +241,10 @@ class InterfaceSimulador:
     def acao_editar_tarefa(self, event):
         # Impede edição se não houver simulação carregada
         if not self.engine: return
+
+        # Se está no modo CPU, não fazer nada
+        if self.modo_visualizacao == "CPUs" : return
+
         #seleciona uma tarefa da tabela para editar
         
         item_id = self.tree.focus() #pega o item selecionado
@@ -200,10 +253,8 @@ class InterfaceSimulador:
         
         if not tarefa: return #se não encontrar a tarefa, retorna por segurança
         
-        # Se a tarefa já acabou, não faz sentido editar
-        if tarefa.estado.name == "FINALIZADO":
-            messagebox.showwarning("Aviso", "Esta tarefa já foi finalizada e não pode ser editada.")
-            return
+        # Verifica se a tarefa está finalizada
+        esta_finalizada = tarefa.estado.name == "FINALIZADO"
 
         # Abre a janela popup de edição
         win = tk.Toplevel(self.root)
@@ -221,11 +272,18 @@ class InterfaceSimulador:
         entry_tempo = tk.Entry(win, justify='center')
         entry_tempo.insert(0, str(tarefa.tempoCorrido))
         entry_tempo.pack(pady=(0, 10))
+
+        # Se está finalizada, desative
+        if esta_finalizada: entry_tempo.config(state="disabled")
+
         #Mostra a prioridade estática
         tk.Label(win, text="Prioridade Estática:", bg="#ECF0F1").pack()
         entry_prio = tk.Entry(win, justify='center')
         entry_prio.insert(0, str(tarefa.prioridadeEstatica))
         entry_prio.pack(pady=(0, 15))
+
+        # Se está finalizada, desative
+        if esta_finalizada: entry_prio.config(state="disabled")
 
         # Variável para controlar se vamos suspender ou acordar a tarefa
         esta_suspensa = tarefa in self.engine.estado_atual.fila_suspensas
@@ -253,10 +311,73 @@ class InterfaceSimulador:
             self.atualizar_tela()
             win.destroy()
 
-        texto_botao_suspender = "Despertar Tarefa" if esta_suspensa else "Suspender Tarefa"
-        cor_botao_suspender = "#F39C12" if esta_suspensa else "#E74C3C"
-        
-        tk.Button(win, text=texto_botao_suspender, bg=cor_botao_suspender, fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=alternar_suspensao).pack(pady=(0, 10))
+        def forcar_finalizacao():
+            # Tira das CPUs
+            for cpu in self.engine.estado_atual.cpus:
+                if cpu.atualTarefa == tarefa:
+                    cpu.atualTarefa = None
+                    
+            # Tira das filas e atualiza estado
+            if tarefa in self.engine.estado_atual.fila_prontos: self.engine.estado_atual.fila_prontos.remove(tarefa)
+            if tarefa in self.engine.estado_atual.fila_suspensas: self.engine.estado_atual.fila_suspensas.remove(tarefa)
+            
+            tarefa.tempoCorrido = 0
+            tarefa.quatum_dado = 0
+            tarefa.idCpu = -1
+            tarefa.estado = EstadosTarefa.FINALIZADO
+            if tarefa not in self.engine.estado_atual.tarefas_finalizadas:
+                self.engine.estado_atual.tarefas_finalizadas.append(tarefa)
+            
+            # Sincroniza e re-escalona
+            if self.engine.historico_estados and self.engine.historico_estados[-1].relogio_global == self.engine.estado_atual.relogio_global:
+                self.engine.historico_estados[-1] = self.engine.estado_atual.clonar_estado()
+            self.engine.escalonar_novas_tarefas()
+
+            self.atualizar_tela()
+            win.destroy()
+            messagebox.showinfo("Sucesso", f"Tarefa T{tarefa.id} foi encerrada à força!")
+
+        def reviver_tarefa():
+            estado_atual = self.engine.estado_atual
+            config = self.engine.config
+            
+            # Descobre o maior ID atual para não duplicar
+            novo_id = max([t.id for t in config.listaTarefasCarregadas]) + 1
+            
+            # Cria a "nova" tarefa clonada
+            nova_tarefa = TCB(
+                tempoDeIngresso=estado_atual.relogio_global, # Nasce AGORA
+                tempoTotal=tarefa.tempoTotal,
+                tempoCorrido=tarefa.tempoTotal,
+                prioridadeEstatica=tarefa.prioridadeEstatica,
+                id=novo_id,
+                cor=tarefa.cor
+            )
+            nova_tarefa.estado = EstadosTarefa.PRONTO
+            
+            # Joga no sistema global e na fila
+            config.listaTarefasCarregadas.append(nova_tarefa)
+            estado_atual.fila_prontos.append(nova_tarefa)
+            
+            self.engine.escalonar_novas_tarefas()
+            
+            if self.engine.historico_estados and self.engine.historico_estados[-1].relogio_global == estado_atual.relogio_global:
+                self.engine.historico_estados[-1] = estado_atual.clonar_estado()
+
+            self.atualizar_tela()
+            win.destroy()
+            messagebox.showinfo("Renasceu!", f"A Tarefa T{tarefa.id} foi revivida! Novo ID: T{novo_id}")
+
+        if esta_finalizada:
+            # Se já acabou, mostra só o botão de Reviver
+            tk.Label(win, text="[ Esta tarefa já FINALIZOU ]", fg="#E74C3C", bg="#ECF0F1", font=("Helvetica", 9, "bold")).pack(pady=5)
+            tk.Button(win, text="✨ Reviver Tarefa (Clonar)", bg="#9B59B6", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=reviver_tarefa).pack(fill=tk.X, padx=30, pady=10)
+        else:
+            # Se está viva, mostra Suspender e Forçar Finalização
+            texto_botao_suspender = "Despertar Tarefa" if esta_suspensa else "Suspender Tarefa"
+            cor_botao_suspender = "#F39C12" if esta_suspensa else "#E74C3C"
+            tk.Button(win, text=texto_botao_suspender, bg=cor_botao_suspender, fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=alternar_suspensao).pack(fill=tk.X, padx=30, pady=5)
+            tk.Button(win, text="🛑 Forçar Finalização", bg="#C0392B", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=forcar_finalizacao).pack(fill=tk.X, padx=30, pady=5)
 
         def salvar_alteracoes():
             try:
@@ -267,9 +388,11 @@ class InterfaceSimulador:
                 if novo_tempo < 0:
                     messagebox.showerror("Erro", "O tempo restante não pode ser negativo.")
                     return
-                elif novo_tempo == 0:
-                    #Tem que criar uma condição para finalizar a tarefa
-                    ...
+                    
+                # Se colocar zero, usa a função de forçar finalização que criamos!
+                elif novo_tempo == 0 and not esta_finalizada:
+                    forcar_finalizacao()
+                    return
                 
                 tarefa.tempoCorrido = novo_tempo
                 tarefa.prioridadeEstatica = nova_prio
@@ -279,12 +402,16 @@ class InterfaceSimulador:
             except ValueError:
                 messagebox.showerror("Erro", "Insira apenas números inteiros válidos.")
 
-        tk.Button(win, text="Salvar Valores", bg="#27AE60", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=salvar_alteracoes).pack()
+        # Só mostra o botão de salvar se a tarefa NÃO estiver morta
+        if not esta_finalizada:
+            tk.Button(win, text="💾 Salvar Valores Manuais", bg="#27AE60", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=salvar_alteracoes).pack(pady=(10, 0))
 
 
     def atualizar_tela(self):
+        # Declara a variável estado puxando da engine
         estado = self.engine.estado_atual
         
+        #Atualiza os textos dos labels
         self.lbl_relogio.config(text=f"Tick Atual: {estado.relogio_global}")
         
         prontos_str = ", ".join([f"T{t.id}" for t in estado.fila_prontos])
@@ -293,29 +420,48 @@ class InterfaceSimulador:
         self.lbl_prontos.config(text=f"Fila de Prontos: [{prontos_str}]")
         self.lbl_futuras.config(text=f"Tarefas Futuras: [{futuras_str}]")
 
-        # Atualiza a tabela com o estado de todas as tarefas
+        # Limpa a tabela atual antes de preencher
         for item in self.tree.get_children():
             self.tree.delete(item)
             
         self.mapa_tarefas.clear()
         
-        todas_tarefas = []
-        todas_tarefas.extend(estado.tarefas_futuras)
-        todas_tarefas.extend(estado.fila_prontos)
-        todas_tarefas.extend(estado.tarefas_finalizadas)
-        todas_tarefas.extend(estado.fila_suspensas) 
+        # Preenche a tabela dependendo do botão (Tarefas ou CPUs)
+        if self.modo_visualizacao == "Tarefas":
+            todas_tarefas = []
+            todas_tarefas.extend(estado.tarefas_futuras)
+            todas_tarefas.extend(estado.fila_prontos)
+            todas_tarefas.extend(estado.tarefas_finalizadas)
+            todas_tarefas.extend(estado.fila_suspensas) 
 
-        for cpu in estado.cpus:
-            if cpu.atualTarefa:
-                todas_tarefas.append(cpu.atualTarefa)
+            for cpu in estado.cpus:
+                if cpu.atualTarefa:
+                    todas_tarefas.append(cpu.atualTarefa)
+                    
+            todas_tarefas.sort(key=lambda t: t.id)
+            
+            for t in todas_tarefas:
+                estado_nome = t.estado.name if hasattr(t.estado, 'name') else str(t.estado)
+                linha_id = self.tree.insert("", tk.END, values=(f"T{t.id}", estado_nome, t.tempoCorrido, t.prioridadeEstatica, t.tempoDeIngresso))
+                self.mapa_tarefas[linha_id] = t 
                 
-        todas_tarefas.sort(key=lambda t: t.id)
-        
-        for t in todas_tarefas:
-            estado_nome = t.estado.name if hasattr(t.estado, 'name') else str(t.estado)
-            linha_id = self.tree.insert("", tk.END, values=(f"T{t.id}", estado_nome, t.tempoCorrido, t.prioridadeEstatica, t.tempoDeIngresso))
-            self.mapa_tarefas[linha_id] = t # Guarda a referência do objeto para poder editar
+        elif self.modo_visualizacao == "CPUs":
+            for cpu in estado.cpus:
+                status_energia = cpu.estado.name if hasattr(cpu.estado, 'name') else str(cpu.estado)
+                tarefa_str = f"T{cpu.atualTarefa.id}" if cpu.atualTarefa else "Nenhuma"
+                quantum_str = f"{cpu.atualTarefa.quatum_dado}/{self.engine.quantumTotal}" if cpu.atualTarefa else "-"
+                
+                # Cálculo da % de uso da CPU (evitando divisão por zero)
+                tempo_total_decorrido = max(1, estado.relogio_de_processo)
+                # Verifica se a CPU tem o atributo tempoAtivo (senão usa 0)
+                tempo_ativo = getattr(cpu, 'tempoAtivo', 0)
+                porcentagem = (tempo_ativo / tempo_total_decorrido) * 100
+                uso_str = f"{porcentagem:.1f}%"
+                
+                linha_id = self.tree.insert("", tk.END, values=(f"CPU {cpu.id}", status_energia, tarefa_str, uso_str, quantum_str))
+                self.mapa_tarefas[linha_id] = cpu
 
+        # Manda desenhar o gráfico com os dados atualizados
         self.desenhar_gantt()
 
     def desenhar_gantt_vazio(self):
