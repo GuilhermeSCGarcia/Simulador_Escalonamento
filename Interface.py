@@ -103,7 +103,7 @@ class InterfaceSimulador:
 
         colunas = ("ID", "Estado", "Tempo Restante", "Prioridade Estática", "Tempo de Ingresso") #colunas da tabelas
 
-        self.tree = ttk.Treeview(self.frame_tabela, columns=colunas, show='headings', height=5)   #configura a tabela indicando as colunas , com altura máxima de 5
+        self.tree = ttk.Treeview(self.frame_tabela, columns=colunas, show='headings', height=5,selectmode="browse")   #configura a tabela indicando as colunas , com altura máxima de 5
         for col in colunas:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="center")
@@ -171,6 +171,9 @@ class InterfaceSimulador:
         self.atualizar_tela()
 
     def acao_executar_tudo(self):
+        if len(self.engine.estado_atual.fila_suspensas) > 0:
+            messagebox.showwarning("Aviso", "Existem tarefas bloqueadas. Por favor, acorde ou remova as tarefas bloqueadas para executar até o fim.")
+            return
         if self.engine.estado_atual.simulacao_finalizada():
             messagebox.showinfo("Fim", "A simulação já foi finalizada!")
             return
@@ -189,14 +192,13 @@ class InterfaceSimulador:
     def acao_editar_tarefa(self, event):
         # Impede edição se não houver simulação carregada
         if not self.engine: return
+        #seleciona uma tarefa da tabela para editar
+        
+        item_id = self.tree.focus() #pega o item selecionado
 
-        selecao = self.tree.selection()
-        if not selecao: return
+        tarefa = self.mapa_tarefas.get(item_id) #procura na tabela qual é a tarefa para edição
         
-        item_id = selecao[0]
-        tarefa = self.mapa_tarefas.get(item_id)
-        
-        if not tarefa: return
+        if not tarefa: return #se não encontrar a tarefa, retorna por segurança
         
         # Se a tarefa já acabou, não faz sentido editar
         if tarefa.estado.name == "FINALIZADO":
@@ -208,16 +210,18 @@ class InterfaceSimulador:
         win.title(f"Editar Tarefa T{tarefa.id}")
         win.geometry("300x320") # Aumentei um pouco a altura
         win.configure(bg="#ECF0F1")
-        win.wait_visibility()
-        win.grab_set()
-
+        win.wait_visibility() # espera que a janela fique visível para bloquear o clique em outras janelas
+        win.grab_set() # garante que os cliques fiquem apenas aqui quando a janela abrir
+        
+        #Exibe o label para editar tarefa
         tk.Label(win, text=f"Editando Tarefa T{tarefa.id}", font=("Helvetica", 12, "bold"), bg="#ECF0F1").pack(pady=15)
-
+        
+        #Mostra o tempo restante
         tk.Label(win, text="Tempo Restante (Ticks):", bg="#ECF0F1").pack()
         entry_tempo = tk.Entry(win, justify='center')
         entry_tempo.insert(0, str(tarefa.tempoCorrido))
         entry_tempo.pack(pady=(0, 10))
-
+        #Mostra a prioridade estática
         tk.Label(win, text="Prioridade Estática:", bg="#ECF0F1").pack()
         entry_prio = tk.Entry(win, justify='center')
         entry_prio.insert(0, str(tarefa.prioridadeEstatica))
@@ -232,10 +236,18 @@ class InterfaceSimulador:
             if esta_suspensa:
                 # Acordar: usar o novo método sincronizado
                 estado_atual.acordar_tarefa(tarefa)
+                #Essa condição é necessária para garantir que a atualização não rode mais um estado em suspenso, pois ele atualiza até o ultimo snapshot, que era antes da mudança
+                #O tick atual vai refletir o intervalo, ou seja, o estado do tick T representa o que rodará durante [T, T+1), então a mudança tem que refletir nesse intervalo, e não no próximo tick
+                if self.engine.historico_estados:
+                    if self.engine.historico_estados[-1].relogio_global == self.engine.estado_atual.relogio_global: #atuliza o ultimo estado para refletir a mudança
+                        self.engine.historico_estados[-1] = self.engine.estado_atual.clonar_estado()
                 messagebox.showinfo("Sucesso", f"Tarefa T{tarefa.id} foi Despertada (Pronta)!")
             else:
                 # Suspender: usar o novo método sincronizado
                 estado_atual.suspender_tarefa(tarefa)
+                if self.engine.historico_estados:
+                    if self.engine.historico_estados[-1].relogio_global == estado_atual.relogio_global:
+                        self.engine.historico_estados[-1] = estado_atual.clonar_estado() # Atualiza o último snapshot para refletir a suspensão
                 messagebox.showinfo("Sucesso", f"Tarefa T{tarefa.id} foi Suspensa!")
             
             self.atualizar_tela()
@@ -255,6 +267,9 @@ class InterfaceSimulador:
                 if novo_tempo < 0:
                     messagebox.showerror("Erro", "O tempo restante não pode ser negativo.")
                     return
+                elif novo_tempo == 0:
+                    #Tem que criar uma condição para finalizar a tarefa
+                    ...
                 
                 tarefa.tempoCorrido = novo_tempo
                 tarefa.prioridadeEstatica = nova_prio
@@ -357,7 +372,7 @@ class InterfaceSimulador:
                     y_pos = mapa_y[tarefa.id]
                     cor_hex = f"#{tarefa.cor}" if not tarefa.cor.startswith('#') else tarefa.cor
                     self.ax.barh(y=y_pos, width=1, left=tick, color=cor_hex, edgecolor='black', height=0.6)
-                    self.ax.text(tick + 0.5, y_pos, f"CPU {cpu.id}\nq:{cpu.atualTarefa.quatum_dado}", ha='center', va='center', color='black', fontweight='bold', fontsize=9)
+                    self.ax.text(tick + 0.5, y_pos, f"CPU {cpu.id}\nq:{cpu.atualTarefa.quatum_dado+1}", ha='center', va='center', color='black', fontweight='bold', fontsize=9)
 
                     # Marcador de início: só quando a tarefa realmente começou a executar
                     if tarefa.id not in tarefas_iniciadas:

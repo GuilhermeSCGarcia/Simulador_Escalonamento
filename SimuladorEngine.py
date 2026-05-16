@@ -28,7 +28,11 @@ class SimuladorEngine:
             if tarefa_futura.tempoDeIngresso == self.estado_atual.relogio_global:
                 tarefas_futuras.append(tarefa_futura)
         for tf in tarefas_futuras:
-            self.estado_atual.ingressar_tarefa(tf)
+            if  not(tf.estado == EstadosTarefa.BLOQUEADO):
+                self.estado_atual.ingressar_tarefa(tf)
+            else:
+                self.estado_atual.tarefas_futuras.remove(tf)
+                continue
         if len(tarefas_futuras) > 0:
             self.escalonar_novas_tarefas()
         
@@ -57,7 +61,10 @@ class SimuladorEngine:
                         #print(f"CPU {p.id} atingiu o quantum no tick {self.estado_atual.relogio_global}.") # Debug: quantum atingido
                         self.escalonar_cpu(p)
             else:
-                p.estado = EstadosCPU.DESLIGADO
+                if(len(self.estado_atual.fila_prontos) > 0 ):
+                    self.escalonar_cpu(p)
+                else:
+                    p.estado = EstadosCPU.DESLIGADO
 
                    
     #Esse método é para escalonar as tarefas na cpu em específico
@@ -169,12 +176,14 @@ class SimuladorEngine:
 
     def avancar_tick(self) -> None: # Método que controla o fluxo de avançar o tempo do sistema
         #self.historico_estados.append(self.estado_atual.clonar_estado())
+        self.mostrarListaDeBloqueio()
         self.resetarMarcadorRandomico()
         self.processarTempoCPU()
         self.processar_cpus()
         self.estado_atual.relogio_global = self.estado_atual.relogio_global + 1
         # Aplica ingressos do novo tick (tarefa com tempoDeIngresso == relogio_global)
         self.verificar_nascimento()
+        self.mostrarListaDeBloqueio()
         self.historico_estados.append(self.estado_atual.clonar_estado())
 
     def retroceder_tick(self) -> None: # Método que controla o fluxo de retroceder o tempo do sistema
@@ -226,4 +235,7 @@ class SimuladorEngine:
                 p.tempoAtivo = p.tempoAtivo + 1
             print(f"Porcentagem de utilização da CPU {p.id} no tick {self.estado_atual.relogio_global}: {(p.tempoAtivo /self.estado_atual.relogio_de_processo)*100}%") # Debug: porcentagem de utilização da CPU
             
-
+    def mostrarListaDeBloqueio(self) -> None:
+        print("Tarefas na fila de bloqueio:")
+        for t in self.estado_atual.fila_suspensas:
+            print(f"Tarefa {t.id} - Estado: {t.estado.name}, CPU associada: {t.idCpu}")

@@ -37,6 +37,10 @@ class SimuladorEstado:
         for cpu in self.cpus:
             if cpu.atualTarefa is not None:
                 return False # Se existe alguma cpu com tarefa a simução ainda não acabou
+        
+        for tarefa in self.fila_suspensas:
+            if tarefa.estado == EstadosTarefa.BLOQUEADO:
+                return False # Se existe alguma tarefa suspensa, a simulação ainda não acabou
             
         return True
 
@@ -64,6 +68,7 @@ class SimuladorEstado:
 
     def suspender_tarefa(self, tarefa: TCB) -> None: # Método para suspender uma tarefa manualmente, mantendo sincronização com engine
         # Remove da fila de prontos, se estiver
+        print("Suspendendo tarefa T{} na cpu{}...".format(tarefa.id,tarefa.idCpu))
         if tarefa in self.fila_prontos:
             self.fila_prontos.remove(tarefa)
         
@@ -72,10 +77,13 @@ class SimuladorEstado:
             if cpu.atualTarefa == tarefa:
                 cpu.atualTarefa = None
         
+        
         # Coloca na fila de suspensas e atualiza estado
         if tarefa not in self.fila_suspensas:
             self.fila_suspensas.append(tarefa)
+        tarefa.idCpu = -1
         tarefa.estado = EstadosTarefa.BLOQUEADO
+        print("informações da tarefa T{}: estado {}, cpu associada {}".format(tarefa.id, tarefa.estado.name, tarefa.idCpu))
 
     def acordar_tarefa(self, tarefa: TCB) -> None: # Método para acordar uma tarefa suspensa, colocando-a de volta na fila de prontos
         # Remove da fila de suspensas
