@@ -322,8 +322,15 @@ class InterfaceSimulador:
         entry_prio.insert(0, str(tarefa.prioridadeEstatica))
         entry_prio.pack(pady=(0, 15))
 
-        # Se está finalizada, desative
+         #Mostra o quantum de ingresso
+        tk.Label(win, text="Tempo de ingresso", bg="#ECF0F1").pack()
+        entry_nascimento = tk.Entry(win, justify='center')
+        entry_nascimento.insert(0, str(tarefa.tempoDeIngresso))
+        entry_nascimento.pack(pady=(0, 15))
+
+        # Se está finalizada, desative as entradas de prioridade e nascimento, pois não faz sentido editar esses campos em uma tarefa que já acabou, e pode causar confusão ou erros na simulação. O tempo restante pode ser editado para forçar uma finalização ou reviver a tarefa, mas a prioridade e o nascimento são parâmetros que deveriam ser fixos após a criação da tarefa.
         if esta_finalizada: entry_prio.config(state="disabled")
+        if esta_finalizada or tarefa.tempoDeIngresso <= self.engine.estado_atual.relogio_global: entry_nascimento.config(state="disabled")
 
         # Variável para controlar se vamos suspender ou acordar a tarefa
         esta_suspensa = tarefa in self.engine.estado_atual.fila_suspensas
@@ -370,9 +377,9 @@ class InterfaceSimulador:
                 self.engine.estado_atual.tarefas_finalizadas.append(tarefa)
             
             # Sincroniza e re-escalona
+            self.engine.escalonar_novas_tarefas()
             if self.engine.historico_estados and self.engine.historico_estados[-1].relogio_global == self.engine.estado_atual.relogio_global:
                 self.engine.historico_estados[-1] = self.engine.estado_atual.clonar_estado()
-            self.engine.escalonar_novas_tarefas()
 
             self.atualizar_tela()
             win.destroy()
@@ -422,8 +429,10 @@ class InterfaceSimulador:
 
         def salvar_alteracoes():
             try:
+                
                 novo_tempo = int(entry_tempo.get())
                 nova_prio = int(entry_prio.get())
+                novo_tempo_nascimento = int(entry_nascimento.get())
                 
                 # Validação: tempo não pode ser negativo
                 if novo_tempo < 0:
@@ -434,9 +443,22 @@ class InterfaceSimulador:
                 elif novo_tempo == 0 and not esta_finalizada:
                     forcar_finalizacao()
                     return
+
+                if novo_tempo_nascimento != tarefa.tempoDeIngresso: # Só faz a validação de nascimento se o valor tiver sido alterado, para permitir salvar outras mudanças sem precisar mexer no nascimento
+                    if novo_tempo_nascimento < 0 or novo_tempo_nascimento < self.engine.estado_atual.relogio_global:
+                        messagebox.showerror("Erro", "O tempo de ingresso deve ser um número inteiro não negativo e maior que o tick atual.")
+                        return
                 
+                tarefa.tempoDeIngresso = novo_tempo_nascimento
                 tarefa.tempoCorrido = novo_tempo
                 tarefa.prioridadeEstatica = nova_prio
+
+                #sincronização e reescalonamento para refletir as mudança no exato instante
+                self.engine.verificar_nascimento() #verifica nascimento caso a tarefa tenha sido colocada para nascer no tick atual
+                self.engine.escalonar_novas_tarefas()
+                if self.engine.historico_estados and self.engine.historico_estados[-1].relogio_global == self.engine.estado_atual.relogio_global:
+                    self.engine.historico_estados[-1] = self.engine.estado_atual.clonar_estado()
+                
                 self.atualizar_tela()
                 win.destroy()
                 messagebox.showinfo("Sucesso", f"Tarefa T{tarefa.id} atualizada!")
