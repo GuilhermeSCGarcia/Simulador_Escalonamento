@@ -68,7 +68,7 @@ class SimuladorEstado:
 
     def suspender_tarefa(self, tarefa: TCB) -> None: # Método para suspender uma tarefa manualmente, mantendo sincronização com engine
         # Remove da fila de prontos, se estiver
-        print("Suspendendo tarefa T{} na cpu{}...".format(tarefa.id,tarefa.idCpu))
+        # print("Suspendendo tarefa T{} na cpu{}...".format(tarefa.id,tarefa.idCpu))
         if tarefa in self.fila_prontos:
             self.fila_prontos.remove(tarefa)
         
@@ -83,7 +83,7 @@ class SimuladorEstado:
             self.fila_suspensas.append(tarefa)
         tarefa.idCpu = -1
         tarefa.estado = EstadosTarefa.BLOQUEADO
-        print("informações da tarefa T{}: estado {}, cpu associada {}".format(tarefa.id, tarefa.estado.name, tarefa.idCpu))
+        # print("informações da tarefa T{}: estado {}, cpu associada {}".format(tarefa.id, tarefa.estado.name, tarefa.idCpu))
 
     def acordar_tarefa(self, tarefa: TCB) -> None: # Método para acordar uma tarefa suspensa, colocando-a de volta na fila de prontos
         # Remove da fila de suspensas

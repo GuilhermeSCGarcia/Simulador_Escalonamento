@@ -22,6 +22,7 @@ class InterfaceSimulador:
 
         self.engine: SimuladorEngine = None
         self.mapa_tarefas = {} # Dicionário para mapear a linha clicada na tabela para o objeto TCB real
+        self.filepath = None # Variável para armazenar o caminho do arquivo carregado, para usar na reiniciação
 
         self.criar_widgets()
 
@@ -67,7 +68,7 @@ class InterfaceSimulador:
         #Texto do control de tempo
         tk.Label(self.frame_controles, text="Controles de Tempo", font=("Helvetica", 12, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(20, 5))
         
-        #Botão de anvançar tick
+        #Botão de avançar tick
         self.btn_avancar = tk.Button(self.frame_controles, text="Avançar Tick (+1)", font=("Helvetica", 11), bg="#2980B9", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_avancar)
         self.btn_avancar.pack(fill=tk.X, pady=5)
 
@@ -78,6 +79,10 @@ class InterfaceSimulador:
         #Botão de executar tudo
         self.btn_executar_tudo = tk.Button(self.frame_controles, text="Executar Até o Fim", font=("Helvetica", 11), bg="#8E44AD", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_executar_tudo)
         self.btn_executar_tudo.pack(fill=tk.X, pady=5)
+
+        #Botão de reiniciar simulação
+        self.btn_reiniciar = tk.Button(self.frame_controles, text="Reiniciar simulação", font=("Helvetica", 11), bg="#EE0B0B", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_reiniciar)
+        self.btn_reiniciar.pack(fill=tk.X, pady=5)
 
         #Botão de exportar gráfico
         tk.Label(self.frame_controles, text="Exportação", font=("Helvetica", 12, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(20, 5))
@@ -92,16 +97,16 @@ class InterfaceSimulador:
         self.frame_grafico = tk.Frame(self.frame_direito, bg="white") #framme do gráfico
         self.frame_grafico.pack(side=tk.TOP, fill=tk.BOTH, expand=True) #configuração para preencher toda o lado direto, em largura e altura na parte de cima
 
-        self.fig, self.ax = plt.subplots(figsize=(8, 4)) #configuração do gráfico para ser integrado ao tk, junto com seu frame de destaque
+        self.fig, self.ax = plt.subplots(figsize=(12, 8)) #configuração do gráfico para ser integrado ao tk, junto com seu frame de destaque
         self.fig.patch.set_facecolor('#F8F9FA') 
         self.ax.set_facecolor('#FFFFFF')
         
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_grafico) #integração do gráfico com o tk, usando o frame do gráfico como destaque
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 0))
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
 
         # Tabela no rodapé
         self.frame_tabela = tk.Frame(self.frame_direito, bg="white", height=150) #frame do editor de tarefa
-        self.frame_tabela.pack(side=tk.BOTTOM, fill=tk.X, padx=20, pady=20)
+        self.frame_tabela.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
         
         tk.Label(self.frame_tabela, text="Editor de Tarefas (Dê um duplo clique em uma tarefa para editá-la)", font=("Helvetica", 10, "bold"), bg="white", fg="#2C3E50").pack(anchor="w", pady=(0,5))
 
@@ -155,13 +160,13 @@ class InterfaceSimulador:
 
 
     def carregar_arquivo(self):
-        filepath = filedialog.askopenfilename(title="Selecione o arquivo config.txt", filetypes=[("Text Files", "*.txt")])
-        if not filepath:
+        self.filepath = filedialog.askopenfilename(title="Selecione o arquivo config.txt", filetypes=[("Text Files", "*.txt")])
+        if not self.filepath:
             return
 
         try:
             #tenta abrir o arquivo txt com a classe SimuladorConfig, usado para processar os arquivos de forma mais fácil
-            config = SimuladorConfig(filepath)
+            config = SimuladorConfig(self.filepath)
             
             #verificação para garantir que há alguma tarefa carregada no sistema, se não exibe uma janela de aviso
             if len(config.listaTarefasCarregadas) == 0:
@@ -186,6 +191,7 @@ class InterfaceSimulador:
             self.btn_avancar.config(state=tk.NORMAL)
             self.btn_retroceder.config(state=tk.NORMAL)
             self.btn_executar_tudo.config(state=tk.NORMAL)
+            self.btn_reiniciar.config(state=tk.NORMAL)
             self.btn_exportar.config(state=tk.NORMAL)
 
             self.atualizar_tela() #atualiza a tela com as informações inciais
@@ -194,7 +200,7 @@ class InterfaceSimulador:
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao ler o arquivo:\n{str(e)}")
 
-    def acao_mudar_algoritmo(self):
+    def acao_mudar_algoritmo(self, event=None):
         if not self.engine: return
         
         novo_alg = self.combo_algoritmo.get()
@@ -214,6 +220,7 @@ class InterfaceSimulador:
 
     def acao_retroceder(self):
         if len(self.engine.historico_estados) <= 1:
+            self.engine.restaurarEstadoZero() # Restaura o estado zero diretamente da engine, para garantir que tudo volte ao início corretamente
             messagebox.showwarning("Aviso", "Já estamos no tick 0!")
             return
         self.engine.retroceder_tick()
@@ -237,6 +244,39 @@ class InterfaceSimulador:
                 messagebox.showinfo("Sucesso", f"Gráfico salvo com sucesso em:\n{filepath}")
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao salvar a imagem:\n{str(e)}")
+
+    def acao_reiniciar(self):
+            #tenta abrir o arquivo txt com a classe SimuladorConfig, usado para processar os arquivos de forma mais fácil
+            config = SimuladorConfig(self.filepath)
+            
+            #verificação para garantir que há alguma tarefa carregada no sistema, se não exibe uma janela de aviso
+            if len(config.listaTarefasCarregadas) == 0:
+                messagebox.showwarning("Aviso", "Nenhuma tarefa foi carregada do arquivo. Verifique o conteúdo.")
+                return
+            
+            #limpar figura anterior quando carregar um novo arquivo, para evitar que a simulação anterior atrapalhe a nova
+            if self.fig:
+                plt.close(self.fig)
+            
+            
+            estado_inicial = SimuladorEstado(config.listaCPU, config.listaTarefasCarregadas, config.quantum) #prepra o estado inicial
+            self.engine = SimuladorEngine(config, estado_inicial) #prepara a engine do simulador
+            #Atualiza as informações do painel lateral com os dados do arquivos carregado
+            self.lbl_info.config(text=f"Algoritmo: {config.algoritmoEscalomento}\nCPUs: {config.qtde_cpus}\nTarefas carregadas: {len(config.listaTarefasCarregadas)}\nQuantum total: {config.quantum}")
+            
+            # Destrava e seta o algoritmo atual ---
+            self.combo_algoritmo.config(state="readonly")
+            self.combo_algoritmo.set(config.algoritmoEscalomento.upper())
+
+            #ativa os botões para funcionar apos carregar as configurações
+            self.btn_avancar.config(state=tk.NORMAL)
+            self.btn_retroceder.config(state=tk.NORMAL)
+            self.btn_executar_tudo.config(state=tk.NORMAL)
+            self.btn_reiniciar.config(state=tk.NORMAL)
+            self.btn_exportar.config(state=tk.NORMAL)
+
+            self.atualizar_tela() #atualiza a tela com as informações inciais
+            messagebox.showinfo("Sucesso", "Simulação reiniciada com sucesso!")
 
     def acao_editar_tarefa(self, event):
         # Impede edição se não houver simulação carregada
@@ -318,6 +358,7 @@ class InterfaceSimulador:
                     cpu.atualTarefa = None
                     
             # Tira das filas e atualiza estado
+            if tarefa in self.engine.estado_atual.tarefas_futuras: self.engine.estado_atual.tarefas_futuras.remove(tarefa)
             if tarefa in self.engine.estado_atual.fila_prontos: self.engine.estado_atual.fila_prontos.remove(tarefa)
             if tarefa in self.engine.estado_atual.fila_suspensas: self.engine.estado_atual.fila_suspensas.remove(tarefa)
             
@@ -371,13 +412,13 @@ class InterfaceSimulador:
         if esta_finalizada:
             # Se já acabou, mostra só o botão de Reviver
             tk.Label(win, text="[ Esta tarefa já FINALIZOU ]", fg="#E74C3C", bg="#ECF0F1", font=("Helvetica", 9, "bold")).pack(pady=5)
-            tk.Button(win, text="✨ Reviver Tarefa (Clonar)", bg="#9B59B6", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=reviver_tarefa).pack(fill=tk.X, padx=30, pady=10)
+            tk.Button(win, text="Reviver Tarefa (Clonar)", bg="#9B59B6", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=reviver_tarefa).pack(fill=tk.X, padx=30, pady=10)
         else:
             # Se está viva, mostra Suspender e Forçar Finalização
             texto_botao_suspender = "Despertar Tarefa" if esta_suspensa else "Suspender Tarefa"
             cor_botao_suspender = "#F39C12" if esta_suspensa else "#E74C3C"
             tk.Button(win, text=texto_botao_suspender, bg=cor_botao_suspender, fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=alternar_suspensao).pack(fill=tk.X, padx=30, pady=5)
-            tk.Button(win, text="🛑 Forçar Finalização", bg="#C0392B", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=forcar_finalizacao).pack(fill=tk.X, padx=30, pady=5)
+            tk.Button(win, text="Forçar Finalização", bg="#C0392B", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=forcar_finalizacao).pack(fill=tk.X, padx=30, pady=5)
 
         def salvar_alteracoes():
             try:
@@ -408,8 +449,12 @@ class InterfaceSimulador:
 
 
     def atualizar_tela(self):
+        self.ax.set_title(f"Execução - {self.engine.config.algoritmoEscalomento}", fontsize=14, fontweight="bold", color="#2C3E50") # atualiza o título do gráfico para refletir o algoritmo atual
         # Declara a variável estado puxando da engine
         estado = self.engine.estado_atual
+        
+        estado_quantum = self.engine.historico_estados[-2] if len(self.engine.historico_estados) > 1 else self.engine.estado_atual
+
         
         #Atualiza os textos dos labels
         self.lbl_relogio.config(text=f"Tick Atual: {estado.relogio_global}")
@@ -449,7 +494,8 @@ class InterfaceSimulador:
             for cpu in estado.cpus:
                 status_energia = cpu.estado.name if hasattr(cpu.estado, 'name') else str(cpu.estado)
                 tarefa_str = f"T{cpu.atualTarefa.id}" if cpu.atualTarefa else "Nenhuma"
-                quantum_str = f"{cpu.atualTarefa.quatum_dado}/{self.engine.quantumTotal}" if cpu.atualTarefa else "-"
+                cpu_quantum = estado_quantum.cpus[cpu.id].atualTarefa.quatum_dado if estado_quantum.cpus[cpu.id].atualTarefa else 0
+                quantum_str = f"{cpu_quantum+1}/{self.engine.quantumTotal}" if cpu.atualTarefa else "-"
                 
                 # Cálculo da % de uso da CPU (evitando divisão por zero)
                 tempo_total_decorrido = max(1, estado.relogio_de_processo)
@@ -480,12 +526,7 @@ class InterfaceSimulador:
         todas_fotos_do_tempo = list(self.engine.historico_estados)
         if len(todas_fotos_do_tempo) == 0:
             todas_fotos_do_tempo = [estado_atual]
-        else:
-            # Substitui o último snapshot pelo estado atual (mesmo tick), para refletir edições
-            if todas_fotos_do_tempo[-1].relogio_global == estado_atual.relogio_global:
-                todas_fotos_do_tempo[-1] = estado_atual
-            else:
-                todas_fotos_do_tempo.append(estado_atual)
+
         
         #Pega a lista de tarefas, ordena elas e mostra no exito y
         todas_tarefas = self.engine.config.listaTarefasCarregadas #carrega a lista de tarefas
@@ -518,7 +559,7 @@ class InterfaceSimulador:
                     y_pos = mapa_y[tarefa.id]
                     cor_hex = f"#{tarefa.cor}" if not tarefa.cor.startswith('#') else tarefa.cor
                     self.ax.barh(y=y_pos, width=1, left=tick, color=cor_hex, edgecolor='black', height=0.6)
-                    self.ax.text(tick + 0.5, y_pos, f"CPU {cpu.id}\nq:{cpu.atualTarefa.quatum_dado+1}", ha='center', va='center', color='black', fontweight='bold', fontsize=9)
+                    self.ax.text(tick + 0.5, y_pos, f"CPU {cpu.id}", ha='center', va='center', color='black', fontweight='bold', fontsize=9)
 
                     # Marcador de início: só quando a tarefa realmente começou a executar
                     if tarefa.id not in tarefas_iniciadas:
@@ -558,6 +599,6 @@ class InterfaceSimulador:
             plt.Rectangle((0,0),1,1, facecolor="white", edgecolor="black", label='Fila de Prontos'),
             plt.Rectangle((0,0),1,1, facecolor="black", edgecolor="white", label='Suspensa'), 
         ]
-        self.ax.legend(handles=legend_elements, loc='upper right', fontsize=9)
+        self.ax.legend(handles=legend_elements, loc='upper right', fontsize=7)
 
         self.canvas.draw()

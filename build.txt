@@ -1,0 +1,6 @@
+python -m PyInstaller --clean --noconfirm --onefile \
+  --hidden-import=PIL._tkinter_finder \
+  --hidden-import=PIL.ImageTk \
+  --collect-submodules=PIL \
+  --collect-data=PIL \
+  main.py

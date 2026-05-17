@@ -10,6 +10,7 @@ from Escalonadores import fabrica_de_escalonadores, EscalonadorBase
 class SimuladorEngine:
     config : SimuladorConfig # Configuração do sistema
     estado_atual: SimuladorEstado # Estado atual
+    estado_zero: SimuladorEstado # Estado zero para restaurar depois
     historico_estados: list[SimuladorEstado] # Lista para guardar todos os estados para retroceder no tempo
     escalonador: EscalonadorBase # Escalonador escolhido com base no config.txt
     quantumTotal: int #representa a quantidade quantum total do sistema
@@ -17,7 +18,8 @@ class SimuladorEngine:
     def __init__(self, config: SimuladorConfig, estado_inicial: SimuladorEstado):
         self.config = config # Salva configuração
         self.estado_atual = estado_inicial # Salva o estado inicial
-        self.historico_estados = [] # Inicia como lista vazia
+        self.estado_zero = None # Salva o estado zero para poder restaurar depois
+        self.historico_estados = [] # Inicia como lista vaziaF
         self.escalonador = fabrica_de_escalonadores(self.config.algoritmoEscalomento) # Seleciona escalonador
         self.quantumTotal = self.config.quantum # Salva o quantum total do sistema
         self.prepararSimulador() # Prepara o simulador, colocando as tarefas que entram no tempo 0 na fila de prontos e chamando o escalonador para definir quais tarefas vão para cada cpu
@@ -71,7 +73,7 @@ class SimuladorEngine:
     #pois quando uma tarefa atinge o quantum ou finaliza, só aquela cpu precisa ser escalonada
     #e nenhuma outra cpu precisa ser escalonada, para evitar trocas de contexto desnecessárias
     def escalonar_cpu(self,p: CPU) -> None: # Método para definir quais tarefas vão rodar em cada cpu
-        print(f"Escalonando CPU {p.id} no tick ({self.estado_atual.relogio_global},{self.estado_atual.relogio_global + 1}].") # Debug: escalonando 
+        # print(f"Escalonando CPU {p.id} no tick ({self.estado_atual.relogio_global},{self.estado_atual.relogio_global + 1}].") # Debug: escalonando 
         candidatos = copy.copy(self.estado_atual.fila_prontos) # copia a fila de prontos para a lista de candidados, para não modificar a original
         if p.atualTarefa is not None: #se aquela cpu já tem uma tarefa, ela também é candidata
             candidatos.append(p.atualTarefa)
@@ -171,19 +173,17 @@ class SimuladorEngine:
                     p.estado = EstadosCPU.LIGADO
             else:
                 p.estado = EstadosCPU.DESLIGADO
-                print(f"CPU {p.id} ficou ociosa.") # Debug: CPU ficou ociosa
+                # print(f"CPU {p.id} ficou ociosa.") # Debug: CPU ficou ociosa
 
 
     def avancar_tick(self) -> None: # Método que controla o fluxo de avançar o tempo do sistema
-        #self.historico_estados.append(self.estado_atual.clonar_estado())
-        self.mostrarListaDeBloqueio()
         self.resetarMarcadorRandomico()
         self.processarTempoCPU()
         self.processar_cpus()
         self.estado_atual.relogio_global = self.estado_atual.relogio_global + 1
         # Aplica ingressos do novo tick (tarefa com tempoDeIngresso == relogio_global)
         self.verificar_nascimento()
-        self.mostrarListaDeBloqueio()
+        #self.mostrarListaDeBloqueio()
         self.historico_estados.append(self.estado_atual.clonar_estado())
 
     def retroceder_tick(self) -> None: # Método que controla o fluxo de retroceder o tempo do sistema
@@ -217,6 +217,7 @@ class SimuladorEngine:
         
         # Processa o tempo das CPUs para contabilizar o tempo ativo desde o tick 0
         # Salvar estado inicial (t=0) no histórico para sincronização com interface
+        self.estado_zero = self.estado_atual.clonar_estado() # Salva o estado zero para poder restaurar depois
         self.historico_estados.append(self.estado_atual.clonar_estado())
 
 
@@ -230,12 +231,20 @@ class SimuladorEngine:
         if self.estado_atual.relogio_global > 0:
             self.estado_atual.relogio_de_processo = self.estado_atual.relogio_de_processo + 1
         for p in self.estado_atual.cpus:
-            print(f"Estado da CPU {p.id} no tick {self.estado_atual.relogio_global}: {'LIGADA' if p.estado == EstadosCPU.LIGADO else 'DESLIGADA'}, Tarefa: {p.atualTarefa.id if p.atualTarefa else 'None'}.") # Debug: estado da CPU
+            # print(f"Estado da CPU {p.id} no tick {self.estado_atual.relogio_global}: {'LIGADA' if p.estado == EstadosCPU.LIGADO else 'DESLIGADA'}, Tarefa: {p.atualTarefa.id if p.atualTarefa else 'None'}.") # Debug: estado da CPU
             if p.estado == EstadosCPU.LIGADO:
                 p.tempoAtivo = p.tempoAtivo + 1
-            print(f"Porcentagem de utilização da CPU {p.id} no tick {self.estado_atual.relogio_global}: {(p.tempoAtivo /self.estado_atual.relogio_de_processo)*100}%") # Debug: porcentagem de utilização da CPU
+            # print(f"Porcentagem de utilização da CPU {p.id} no tick {self.estado_atual.relogio_global}: {(p.tempoAtivo /self.estado_atual.relogio_de_processo)*100}%") # Debug: porcentagem de utilização da CPU
             
     def mostrarListaDeBloqueio(self) -> None:
-        print("Tarefas na fila de bloqueio:")
+        # print("Tarefas na fila de bloqueio:")
         for t in self.estado_atual.fila_suspensas:
-            print(f"Tarefa {t.id} - Estado: {t.estado.name}, CPU associada: {t.idCpu}")
+            # print(f"Tarefa {t.id} - Estado: {t.estado.name}, CPU associada: {t.idCpu}")
+            pass
+
+    def restaurarEstadoZero(self) -> None:
+        if self.estado_zero is None:
+            return
+        self.estado_atual = self.estado_zero.clonar_estado()
+        self.historico_estados = [self.estado_atual.clonar_estado()] #Restaura o estado zero diretamente da engine, para garantir que tudo volte ao início corretamente
+

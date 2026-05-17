@@ -7,6 +7,4 @@ class CPU:
     id: int = -1 #número do processador
     estado: EstadosCPU = EstadosCPU.DESLIGADO #controle de ativado ou não
     atualTarefa : TCB = None # qual tarefa está associado aquele processesador
-    quantumProprio: int = 0 #quantum do prórpio processador
     tempoAtivo: int = 0 #tempo que a cpu ficou ativa
-    historico: list[tuple[int,int,EstadosCPU]] = field(default_factory=list) #histórico de tempo que a cpu ficou ligada

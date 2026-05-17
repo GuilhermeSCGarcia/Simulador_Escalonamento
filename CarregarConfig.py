@@ -1,3 +1,14 @@
+
+'''
+CLASSE: CarregarConfig
+
+Esse classe é responsavel por carregar as configurações do simulador a partir de um arquivo txt, fazer a separação e conferir se estão corretas
+A descisão de usar uma classe pra carregar as configurações foi por modularizar o codigo e separa as responsabilidades
+'''
+
+import re
+
+
 from TCB import TCB
 
 CORES_SUGESTAO = [
@@ -24,8 +35,9 @@ class CarregarConfig:
                     }
         self.listTarefas = [] 
 
-    def carregarArquivoTXT(self,caminho: str): #função para abrir o arquivo e salvar na variavel da classe
-        try:
+        #Método para abrir o arquivo e salvar na variavel da classe
+    def carregarArquivoTXT(self,caminho: str): 
+        try: #try paraa tentar abrir o arquivo, caso haja algum erro, como arquivo não encontrado ou sem permissão, retorna a mensagem de erro
             self.f = open(caminho,"r")
             return "arquivo aberto"
         except FileNotFoundError:
@@ -33,8 +45,8 @@ class CarregarConfig:
         except PermissionError:
             return "Sem permissão para abrir"
     
-    
-    def carregarParametros(self): #função para fazer o parser do arquivo txt
+         #Método para fazer o parser do arquivo txt
+    def carregarParametros(self):
         try:
             for i, linhas in enumerate(self.f): #loop em todas as linhas do arquivo
                 linhas = linhas.strip() #remove espaços
@@ -45,9 +57,9 @@ class CarregarConfig:
                                             "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
                                                 "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])})
                     else:
-                        conteudo = linhas.split(";") #configuraçao das tarefas
+                        conteudo = linhas.split(";") #faz uma lista com elementos separados por ":"
                         tarefa = TCB(
-                            id = -1 if conteudo[0] == "" else int(conteudo[0]),
+                            id = self.parsetarefaId(conteudo[0]), #trata as ids em especial, se a entrada for um número direto ou uma
                             cor = conteudo[1],                        
                             tempoDeIngresso = -1 if conteudo[2] == "" else int(conteudo[2]),     
                             tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
@@ -66,49 +78,48 @@ class CarregarConfig:
         except Exception:
             pass
         
-
-    def getConfigSim(self) -> dict: # Método que retorna as configurações do simulador
+        # Método que retorna as configurações do simulador
+    def getConfigSim(self) -> dict: 
         return self.configSim
-        
-    def getlistaTarefas(self) -> list: # Método que retornar a lista de tarefas
+        #Método que retornar a lista de tarefas
+    def getlistaTarefas(self) -> list: 
         return self.listTarefas
+
+    def parsetarefaId(self, valor: str) -> int:
+        valor = valor.strip() #remove espaços em branco
+        if valor == "": # se foir vazio, retorna -1 para ser preenchido depois
+            return -1
+        if valor.isdigit(): # se for um número, retorna o número inteiro
+            return int(valor)
+        if not valor[0].isdigit(): # Se o  primeiro caractere não for um dígito, tenta extraior os digitgitos da entrada
+            digits = re.findall(r"\d+", valor) #extrai todos os digitos de uma string
+            if digits: #Se a entrada não for vazie e tiver digitos, retorna o númer inteiro formado pelos digitos
+                return int("".join(digits)) #juntos os digitos encontrados e converve para inteiro
+        raise ValueError(f"Id de tarefa invalido: '{valor}'. acresente algum número para que possa ser identificada.")
     
+    #Método para checar os parametros das tarefas e preeencher os vazios com valores padrão ou sugerido
     def checarParametros(self, T: list[TCB]):
-        l_id: list[int] = []
-        l_cor: list[str] = []
+        l_id: list[int] = [] #lista para armazenar os ids já usados
+        l_cor: list[str] = [] #lista para armazenar as cores já usadas
         for t in T:
-            l_id.append(t.id)
-            l_cor.append(t.cor)
+            l_id.append(t.id) #adiciona o id da tarefa na lista de ids usados
+            l_cor.append(t.cor) #adiciona a cor da tarefa na lista de cores usadas
         for t in T:
-            if t.id == -1:
+            if t.id == -1: #se o id da tarefa for -1, o id tava vazio, então atribui um id com base no maior id já usado + 1
                 t.id = max(l_id) + 1
                 l_id.append(t.id)
-            if t.cor == "":
+            if t.cor == "": # se a cor for vazia, atribui uma cor sugerida dos enum de cres
                 for cor in CORES_SUGESTAO:
                     if cor not in l_cor:
                         t.cor = cor
                         l_cor.append(cor)
                         break
-            if t.tempoDeIngresso == -1:
+            if t.tempoDeIngresso == -1: # se o for tempo de ingresso vazio, atribui 0 
                 t.tempoDeIngresso = 0
-            if t.tempoTotal == -1:
+            if t.tempoTotal == -1: #se o tempo total for vazio, atribui 10 no total e no corrido
                 t.tempoTotal = 10
                 t.tempoCorrido = 10
-            if t.prioridadeEstatica == -1:
+            if t.prioridadeEstatica == -1: #se a prioridade estatica for vazia, atribui 5
                 t.prioridadeEstatica = 5
             
 
-        
-
-
-#teste
-
-def main():
-    objcarregar = CarregarConfig()
-    print(objcarregar.carregarArquivoTXT("config2.txt"))
-    objcarregar.carregarParametros()
-    print(objcarregar.listTarefas)
-    
-if __name__ == "__main__":
-    main()
-    

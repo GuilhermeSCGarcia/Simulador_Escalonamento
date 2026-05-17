@@ -13,7 +13,6 @@ class TCB:
     estado: EstadosTarefa = EstadosTarefa.NOVO  #guardar o estado da tarefa, incia como novo, que é quando ela entrou no sistema 
     idCpu: int = -1 #cpu associada com o processo
     listaEvento : list[int] = field(default_factory=list) #guarda uma lista de evento para o projeto B
-    historico: list[tuple[int,int,EstadosTarefa]] = field(default_factory=list) # guarda o histórico de tempo e o estado da tarefa(inicio,fim,qual_estado)
     estavaRodando: bool = False # Atributo para desempate no escalonamento
     sofreu_sorteio: bool = False # Atributo para determinar se a tarefa foi escolhida com base no sorteio
     quatum_dado: int = 0
