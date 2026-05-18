@@ -1,3 +1,10 @@
+'''
+CLASSE: TCB 
+
+É a estrutura de dados que representa um modelo das tarefas no sistema operacional.] O motor do simulador e os escalonadores consultam 
+essas informações a cada tick para tomar decisões de troca de contexto e atualizar o gráfico.
+'''
+
 from Estados import EstadosTarefa
 from dataclasses import dataclass, field
 

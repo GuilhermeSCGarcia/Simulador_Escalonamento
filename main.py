@@ -1,3 +1,11 @@
+'''
+Classe: Main 
+
+Este arquivo é o único que deve ser executado para rodar 
+o simulador. Ele inicializa o framework gráfico (Tkinter) e invoca a classe controladora 
+da interface, mantendo o loop de eventos ativo.
+'''
+
 import tkinter as tk
 from Interface import InterfaceSimulador
 

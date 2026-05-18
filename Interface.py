@@ -1,3 +1,12 @@
+'''
+Classe: InterfaceSimulador 
+
+Este arquivo é a interface gráfica do simulador. Ele utiliza o Tkinter para desenhar 
+janelas, botões e tabelas, e o Matplotlib para renderizar o Gráfico de Gantt dinamicamente.
+A sua principal responsabilidade é capturar as ações do usuário (cliques), traduzí-las 
+em comandos para o motor (SimuladorEngine) e refletir as mudanças visuais na tela.
+'''
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import matplotlib
@@ -18,183 +27,206 @@ class InterfaceSimulador:
         self.root = root
         self.root.title("Simulador de Escalonamento de SO")
         self.root.geometry("1600x900")
-        self.root.configure(bg="#F0F0F0") 
+        self.root.configure(bg="#ECF0F1") # Cor de fundo principal
 
+        # Estilo moderno para a Tabela 
+        self.style = ttk.Style()
+        self.style.theme_use("clam") 
+        self.style.configure("Treeview.Heading", font=('Helvetica', 10, 'bold'), background="#BDC3C7", foreground="#2C3E50")
+        self.style.configure("Treeview", font=('Helvetica', 10), rowheight=25, background="#FFFFFF", fieldbackground="#FFFFFF")
+        self.style.map("Treeview", background=[('selected', '#3498DB')]) 
+
+        # Inicia o motor do simuulador, o mapa das tarefas e o camiinho para exportar o gráfico
         self.engine: SimuladorEngine = None
-        self.mapa_tarefas = {} # Dicionário para mapear a linha clicada na tabela para o objeto TCB real
-        self.filepath = None # Variável para armazenar o caminho do arquivo carregado, para usar na reiniciação
+        self.mapa_tarefas = {} 
+        self.filepath = None 
 
+        # Chama método que cria os componentes da interface gráfica
         self.criar_widgets()
 
     def criar_widgets(self):
-        # --- PAINEL LATERAL ---
-        self.frame_controles = tk.Frame(self.root, width=300, bg="#2C3E50", padx=20, pady=20) #configura a coluna da esquerda, onde ficam os controles, e a cor de fundo
-        self.frame_controles.pack(side=tk.LEFT, fill=tk.Y) #preenche na região da esquerda, com altura total da janela
-        self.frame_controles.pack_propagate(False) #impede que o autoajuste do frame mude o tamanho definidos
+        # PAINEL LATERAL ESQUERDO 
 
-        #Texto para configurar o painel de controle
+        # Cria um Frame fixo à esquerda para abrigar os menus.
+        self.frame_controles = tk.Frame(self.root, width=300, bg="#2C3E50", padx=20, pady=20) 
+        self.frame_controles.pack(side=tk.LEFT, fill=tk.Y) # fill=tk.Y faz a barra esticar de cima a baixo na tela
+        
+        # Isso força ela a manter os 300px de largura independentemente do que tiver dentro.
+        self.frame_controles.pack_propagate(False) 
+
+        # Título do painel
         tk.Label(self.frame_controles, text="Painel de Controle", font=("Helvetica", 18, "bold"), bg="#2C3E50", fg="white").pack(pady=(0, 20))
 
-        #Botão para carregar o arquivo txt
-        self.btn_carregar = tk.Button(self.frame_controles, text="Carregar config.txt", font=("Helvetica", 12), bg="#27AE60", fg="white", relief="flat", command=self.carregar_arquivo)
-        self.btn_carregar.pack(fill=tk.X, pady=10)
+        # Botão principal de carregamento. O cursor="hand2" transforma a setinha do mouse em uma "mãozinha" de clique.
+        self.btn_carregar = tk.Button(self.frame_controles, text="Carregar Configurações", font=("Helvetica", 12, "bold"), bg="#3498DB", fg="white", relief="flat", cursor="hand2", command=self.carregar_arquivo)
+        self.btn_carregar.pack(fill=tk.X, pady=10) # fill=tk.X faz o botão esticar horizontalmente
         
-        # Mensagem para mostrar que não tem configuração carregada
+        # Label de status do arquivo. Inicialmente mostra que não há nada carregado.
         self.lbl_info = tk.Label(self.frame_controles, text="Nenhuma configuração carregada.", font=("Helvetica", 10), bg="#2C3E50", fg="#BDC3C7", justify=tk.LEFT)
         self.lbl_info.pack(anchor="w", pady=10)
 
-        # Mudar Algoritmo em Tempo de execução
+        # Dropdown para troca de algoritmo em "Hot Swap" (Tempo de execução)
         tk.Label(self.frame_controles, text="Algoritmo Atual:", font=("Helvetica", 10, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(10, 0))
         self.combo_algoritmo = ttk.Combobox(self.frame_controles, values=["SRTF", "PRIOP"], state="disabled")
         self.combo_algoritmo.pack(fill=tk.X, pady=(2, 10))
-        self.combo_algoritmo.bind("<<ComboboxSelected>>", self.acao_mudar_algoritmo)
+        self.combo_algoritmo.bind("<<ComboboxSelected>>", self.acao_mudar_algoritmo) # Aciona a troca na Engine assim que o usuário clica numa opção
         
-        #frame que contém o status do sistema
+        # Um frame com fundo ligeiramente diferente para destacar o Relógio e as Filas
         self.frame_status = tk.Frame(self.frame_controles, bg="#34495E", padx=10, pady=10)
         self.frame_status.pack(fill=tk.X, pady=20)
 
-        #informação do tick atual
+        # Relógio Global (Tick Atual)
         self.lbl_relogio = tk.Label(self.frame_status, text="Tick Atual: 0", font=("Courier", 14, "bold"), bg="#34495E", fg="#F1C40F")
         self.lbl_relogio.pack(anchor="w")
 
-        #informação da fila de prontos
+        # Labels das filas.
         self.lbl_prontos = tk.Label(self.frame_status, text="Fila de Prontos: []", font=("Helvetica", 10), bg="#34495E", fg="white", wraplength=240, justify=tk.LEFT)
         self.lbl_prontos.pack(anchor="w", pady=(10,0))
         
-        #informação das tarefas futuras
         self.lbl_futuras = tk.Label(self.frame_status, text="Tarefas Futuras: []", font=("Helvetica", 10), bg="#34495E", fg="#95A5A6", wraplength=240, justify=tk.LEFT)
         self.lbl_futuras.pack(anchor="w", pady=(10,0))
 
-        #Texto do control de tempo
-        tk.Label(self.frame_controles, text="Controles de Tempo", font=("Helvetica", 12, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(20, 5))
+        # --- Botões de Manipulação do Tempo ---
+        tk.Label(self.frame_controles, text="Controles de Tempo", font=("Helvetica", 12, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(15, 5))
         
-        #Botão de avançar tick
-        self.btn_avancar = tk.Button(self.frame_controles, text="Avançar Tick (+1)", font=("Helvetica", 11), bg="#2980B9", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_avancar)
-        self.btn_avancar.pack(fill=tk.X, pady=5)
+        # Todos iniciam em state=tk.DISABLED para evitar que o usuário avance o tempo sem ter arquivo carregado
+        self.btn_avancar = tk.Button(self.frame_controles, text="Avançar Tick (+1)", font=("Helvetica", 11), bg="#2980B9", fg="white", relief="flat", cursor="hand2", state=tk.DISABLED, command=self.acao_avancar)
+        self.btn_avancar.pack(fill=tk.X, pady=3)
 
-        #Botão de retroceder tick
-        self.btn_retroceder = tk.Button(self.frame_controles, text="Voltar Tick (-1)", font=("Helvetica", 11), bg="#E67E22", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_retroceder)
-        self.btn_retroceder.pack(fill=tk.X, pady=5)
+        self.btn_retroceder = tk.Button(self.frame_controles, text="Voltar Tick (-1)", font=("Helvetica", 11), bg="#2980B9", fg="white", relief="flat", cursor="hand2", state=tk.DISABLED, command=self.acao_retroceder)
+        self.btn_retroceder.pack(fill=tk.X, pady=3)
 
-        #Botão de executar tudo
-        self.btn_executar_tudo = tk.Button(self.frame_controles, text="Executar Até o Fim", font=("Helvetica", 11), bg="#8E44AD", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_executar_tudo)
-        self.btn_executar_tudo.pack(fill=tk.X, pady=5)
+        self.btn_executar_tudo = tk.Button(self.frame_controles, text="Executar Até o Fim", font=("Helvetica", 11), bg="#2980B9", fg="white", relief="flat", cursor="hand2", state=tk.DISABLED, command=self.acao_executar_tudo)
+        self.btn_executar_tudo.pack(fill=tk.X, pady=3)
 
-        #Botão de reiniciar simulação
-        self.btn_reiniciar = tk.Button(self.frame_controles, text="Reiniciar simulação", font=("Helvetica", 11), bg="#EE0B0B", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_reiniciar)
-        self.btn_reiniciar.pack(fill=tk.X, pady=5)
+        self.btn_reiniciar = tk.Button(self.frame_controles, text="Reiniciar Simulação", font=("Helvetica", 11), bg="#2471A3", fg="white", relief="flat", cursor="hand2", state=tk.DISABLED, command=self.acao_reiniciar)
+        self.btn_reiniciar.pack(fill=tk.X, pady=3)
 
-        #Botão de exportar gráfico
-        tk.Label(self.frame_controles, text="Exportação", font=("Helvetica", 12, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(20, 5))
-        self.btn_exportar = tk.Button(self.frame_controles, text="Exportar Gráfico (.PNG)", font=("Helvetica", 11), bg="#7F8C8D", fg="white", relief="flat", state=tk.DISABLED, command=self.acao_exportar)
-        self.btn_exportar.pack(fill=tk.X, pady=5)
+        tk.Label(self.frame_controles, text="Exportação", font=("Helvetica", 12, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(15, 5))
+        self.btn_exportar = tk.Button(self.frame_controles, text="Exportar Gráfico (.PNG)", font=("Helvetica", 11), bg="#34495E", fg="white", relief="flat", cursor="hand2", state=tk.DISABLED, command=self.acao_exportar)
+        self.btn_exportar.pack(fill=tk.X, pady=3)
 
-        # --- PAINEL DIREITO (Gráfico + Tabela) ---
-        self.frame_direito = tk.Frame(self.root, bg="white") #configura um frame para o lado direito, onde ficam o gráfico e a tabela, e a cor de fundo
-        self.frame_direito.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True) #preenche na região da direita, com altura total da janela e largura máxima possível
+        # PAINEL DIREITO (Visão de Dados e Gráfico)
 
-        # Matplotlib no topo
-        self.frame_grafico = tk.Frame(self.frame_direito, bg="white") #framme do gráfico
-        self.frame_grafico.pack(side=tk.TOP, fill=tk.BOTH, expand=True) #configuração para preencher toda o lado direto, em largura e altura na parte de cima
+        # Cria a área principal à direita. Expande em ambos os eixos
+        self.frame_direito = tk.Frame(self.root, bg="#ECF0F1") 
+        self.frame_direito.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True) 
 
-        self.fig, self.ax = plt.subplots(figsize=(12, 8)) #configuração do gráfico para ser integrado ao tk, junto com seu frame de destaque
+        # PanedWindow: Permite criar uma divisória arrastável entre o gráfico e a tabela.
+        self.paned_window = tk.PanedWindow(self.frame_direito, orient=tk.VERTICAL, bg="#BDC3C7", bd=0, sashwidth=10, sashpad=2, sashrelief="raised")
+        self.paned_window.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+
+        # Sub-Painel Superior: Gráfico de Gantt
+        self.frame_grafico = tk.Frame(self.paned_window, bg="white") 
+        self.paned_window.add(self.frame_grafico, minsize=300, stretch="always") # stretch="always" prioriza o aumento do gráfico se a tela for maximizada
+
+        # Preparação do Matplotlib. figsize define o aspecto inicial.
+        self.fig, self.ax = plt.subplots(figsize=(12, 8)) 
         self.fig.patch.set_facecolor('#F8F9FA') 
-        self.ax.set_facecolor('#FFFFFF')
+        self.ax.set_facecolor('#FFFFFF') 
         
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_grafico) #integração do gráfico com o tk, usando o frame do gráfico como destaque
+        # Integração: Converte o plot do Matplotlib em um widget utilizável pelo Tkinter
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_grafico) 
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
 
-        # Tabela no rodapé
-        self.frame_tabela = tk.Frame(self.frame_direito, bg="white", height=150) #frame do editor de tarefa
-        self.frame_tabela.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+        # Sub-Painel Inferior: Tabela de Tarefas/CPUs 
+        self.frame_tabela = tk.Frame(self.paned_window, bg="white", padx=10, pady=10) 
+        self.paned_window.add(self.frame_tabela, minsize=150) 
         
         tk.Label(self.frame_tabela, text="Editor de Tarefas (Dê um duplo clique em uma tarefa para editá-la)", font=("Helvetica", 10, "bold"), bg="white", fg="#2C3E50").pack(anchor="w", pady=(0,5))
 
-        # --- Botões para alternar a tabela ---
+        # Botões para alternar o modo de visão da tabela
         frame_abas = tk.Frame(self.frame_tabela, bg="white")
         frame_abas.pack(fill=tk.X, pady=(0,5))
         
-        self.btn_ver_tarefas = tk.Button(frame_abas, text="📊 Ver Tarefas", font=("Helvetica", 10), bg="#3498DB", fg="white", relief="flat", command=lambda: self.mudar_aba_tabela("Tarefas"))
+        self.btn_ver_tarefas = tk.Button(frame_abas, text="📊 Ver Tarefas", font=("Helvetica", 10, "bold"), bg="#3498DB", fg="white", relief="flat", cursor="hand2", command=lambda: self.mudar_aba_tabela("Tarefas"))
         self.btn_ver_tarefas.pack(side=tk.LEFT, padx=(0, 5))
 
-        self.btn_ver_cpus = tk.Button(frame_abas, text="💻 Ver Uso das CPUs", font=("Helvetica", 10), bg="#95A5A6", fg="white", relief="flat", command=lambda: self.mudar_aba_tabela("CPUs"))
+        self.btn_ver_cpus = tk.Button(frame_abas, text="💻 Ver Uso das CPUs", font=("Helvetica", 10, "bold"), bg="#95A5A6", fg="white", relief="flat", cursor="hand2", command=lambda: self.mudar_aba_tabela("CPUs"))
         self.btn_ver_cpus.pack(side=tk.LEFT)
 
-        # Controle de modo atual
         self.modo_visualizacao = "Tarefas"
 
-        # Tabela base (sem as colunas fixas ainda, pois o método vai inseri-las)
-        self.tree = ttk.Treeview(self.frame_tabela, show='headings', height=5, selectmode="browse")   
+        # Treeview: A tabela de tarefas ou CPUs.
+        self.tree = ttk.Treeview(self.frame_tabela, show='headings', selectmode="browse")   
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        # Scrollbar vertical vinculada nativamente ao movimento Y da Treeview
         scroll_y = ttk.Scrollbar(self.frame_tabela, orient="vertical", command=self.tree.yview) 
         self.tree.configure(yscrollcommand=scroll_y.set) 
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Ao dar dois cliques do mouse, a função de popup de edição será chamada
         self.tree.bind("<Double-1>", self.acao_editar_tarefa)
-        self.desenhar_gantt_vazio()
         
-        # Chama a função para criar as colunas iniciais de Tarefas
+        # Primeira renderização (estado vazio antes do upload do txt)
+        self.desenhar_gantt_vazio()
         self.mudar_aba_tabela("Tarefas")
-
+        
     def mudar_aba_tabela(self, modo):
+        # Atualiza a variável de controle da classe para o modo selecionado
         self.modo_visualizacao = modo
+        
+        # Define as cores para feedback visual (Aba Clicada vs Aba Desativada)
+        cor_ativa = "#2980B9" 
+        cor_inativa = "#95A5A6" #
+
+        # Define as colunas dependendo do botão clicado
         if modo == "Tarefas":
-            self.btn_ver_tarefas.config(bg="#3498DB") # Fica azul
-            self.btn_ver_cpus.config(bg="#95A5A6")    # Fica cinza
+            self.btn_ver_tarefas.config(bg=cor_ativa)
+            self.btn_ver_cpus.config(bg=cor_inativa)    
             colunas = ("ID", "Estado", "Tempo Restante", "Prioridade Estática", "Tempo de Ingresso")
         else:
-            self.btn_ver_tarefas.config(bg="#95A5A6") # Fica cinza
-            self.btn_ver_cpus.config(bg="#3498DB")    # Fica azul
+            self.btn_ver_tarefas.config(bg=cor_inativa) 
+            self.btn_ver_cpus.config(bg=cor_ativa)    
             colunas = ("ID CPU", "Status Energia", "Tarefa Atual", "Uso (%)", "Quantum Atual")
 
-        # Configura as novas colunas
+        # Aplica dinamicamente as colunas escolhidas na tabela
         self.tree["columns"] = colunas
         for col in colunas:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, anchor="center")
+            self.tree.heading(col, text=col) # Seta o texto do cabeçalho
+            self.tree.column(col, anchor="center", stretch=True, width=150)
             
-        # Atualiza os dados se a engine já estiver carregada
+        # Se a simulação já tem dados rodando (engine não é nula), atualizamos a visualização para mostrar os dados da nova aba instantaneamente
         if self.engine: 
             self.atualizar_tela()
 
-
     def carregar_arquivo(self):
-        self.filepath = filedialog.askopenfilename(title="Selecione o arquivo config.txt", filetypes=[("Text Files", "*.txt")])
+        self.filepath = filedialog.askopenfilename(title="Selecione o arquivo de configuração", filetypes=[("Text Files", "*.txt")])
         if not self.filepath:
             return
 
         try:
-            #tenta abrir o arquivo txt com a classe SimuladorConfig, usado para processar os arquivos de forma mais fácil
+            # tenta abrir o arquivo txt com a classe SimuladorConfig, usado para processar os arquivos de forma mais fácil
             config = SimuladorConfig(self.filepath)
             
-            #verificação para garantir que há alguma tarefa carregada no sistema, se não exibe uma janela de aviso
+            # verificação para garantir que há alguma tarefa carregada no sistema, se não exibe uma janela de aviso
             if len(config.listaTarefasCarregadas) == 0:
                 messagebox.showwarning("Aviso", "Nenhuma tarefa foi carregada do arquivo. Verifique o conteúdo.")
                 return
             
-            #limpar figura anterior quando carregar um novo arquivo, para evitar que a simulação anterior atrapalhe a nova
+            # limpar figura anterior quando carregar um novo arquivo, para evitar que a simulação anterior atrapalhe a nova
             if self.fig:
                 plt.close(self.fig)
             
             
             estado_inicial = SimuladorEstado(config.listaCPU, config.listaTarefasCarregadas, config.quantum) #prepra o estado inicial
             self.engine = SimuladorEngine(config, estado_inicial) #prepara a engine do simulador
-            #Atualiza as informações do painel lateral com os dados do arquivos carregado
+            # Atualiza as informações do painel lateral com os dados do arquivos carregado
             self.lbl_info.config(text=f"Algoritmo: {config.algoritmoEscalomento}\nCPUs: {config.qtde_cpus}\nTarefas carregadas: {len(config.listaTarefasCarregadas)}\nQuantum total: {config.quantum}")
             
             # Destrava e seta o algoritmo atual ---
             self.combo_algoritmo.config(state="readonly")
             self.combo_algoritmo.set(config.algoritmoEscalomento.upper())
 
-            #ativa os botões para funcionar apos carregar as configurações
+            # ativa os botões para funcionar apos carregar as configurações
             self.btn_avancar.config(state=tk.NORMAL)
             self.btn_retroceder.config(state=tk.NORMAL)
             self.btn_executar_tudo.config(state=tk.NORMAL)
             self.btn_reiniciar.config(state=tk.NORMAL)
             self.btn_exportar.config(state=tk.NORMAL)
 
-            self.atualizar_tela() #atualiza a tela com as informações inciais
+            self.atualizar_tela() # atualiza a tela com as informações inciais
             messagebox.showinfo("Sucesso", "Configuração carregada com sucesso!")
     
         except Exception as e:
@@ -211,6 +243,7 @@ class InterfaceSimulador:
         
         self.atualizar_tela() # Atualiza para mudar o título do gráfico instantaneamente
 
+    # Método que é acionado quando o botão de avançar é clicado
     def acao_avancar(self):
         if self.engine.estado_atual.simulacao_finalizada():
             messagebox.showinfo("Fim", "A simulação já foi finalizada!")
@@ -218,6 +251,7 @@ class InterfaceSimulador:
         self.engine.avancar_tick()
         self.atualizar_tela()
 
+    # Método que é acionado quando o botão de retroceder é clicado
     def acao_retroceder(self):
         if len(self.engine.historico_estados) <= 1:
             self.engine.restaurarEstadoZero() # Restaura o estado zero diretamente da engine, para garantir que tudo volte ao início corretamente
@@ -226,6 +260,7 @@ class InterfaceSimulador:
         self.engine.retroceder_tick()
         self.atualizar_tela()
 
+    # Método que é acionado quando o botão de execuutar tuudo é clicado
     def acao_executar_tudo(self):
         if len(self.engine.estado_atual.fila_suspensas) > 0:
             messagebox.showwarning("Aviso", "Existem tarefas bloqueadas. Por favor, acorde ou remova as tarefas bloqueadas para executar até o fim.")
@@ -236,7 +271,9 @@ class InterfaceSimulador:
         self.engine.executar_tudo()
         self.atualizar_tela()
 
+    # Método que é acionado quando o botão de exportar é clicado
     def acao_exportar(self):
+        # Salva o png no caminho escolhido pelo uusuuário
         try:
             filepath = filedialog.asksaveasfilename(defaultextension=".png", title="Salvar Gráfico de Gantt", filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg"), ("SVG", "*.svg")])
             if filepath:
@@ -245,6 +282,7 @@ class InterfaceSimulador:
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao salvar a imagem:\n{str(e)}")
 
+    # Método que é acionado quando o botão de reiniciar é clicado
     def acao_reiniciar(self):
             #tenta abrir o arquivo txt com a classe SimuladorConfig, usado para processar os arquivos de forma mais fácil
             config = SimuladorConfig(self.filepath)
@@ -278,6 +316,7 @@ class InterfaceSimulador:
             self.atualizar_tela() #atualiza a tela com as informações inciais
             messagebox.showinfo("Sucesso", "Simulação reiniciada com sucesso!")
 
+    # Método que é acionado quando acontece dois cliques em uma tarefa para edita-la 
     def acao_editar_tarefa(self, event):
         # Impede edição se não houver simulação carregada
         if not self.engine: return
@@ -286,12 +325,11 @@ class InterfaceSimulador:
         if self.modo_visualizacao == "CPUs" : return
 
         #seleciona uma tarefa da tabela para editar
-        
-        item_id = self.tree.focus() #pega o item selecionado
+        item_id = self.tree.focus() 
 
-        tarefa = self.mapa_tarefas.get(item_id) #procura na tabela qual é a tarefa para edição
+        tarefa = self.mapa_tarefas.get(item_id) # procura na tabela qual é a tarefa para edição
         
-        if not tarefa: return #se não encontrar a tarefa, retorna por segurança
+        if not tarefa: return # se não encontrar a tarefa
         
         # Verifica se a tarefa está finalizada
         esta_finalizada = tarefa.estado.name == "FINALIZADO"
@@ -299,15 +337,15 @@ class InterfaceSimulador:
         # Abre a janela popup de edição
         win = tk.Toplevel(self.root)
         win.title(f"Editar Tarefa T{tarefa.id}")
-        win.geometry("300x320") # Aumentei um pouco a altura
+        win.geometry("300x320") 
         win.configure(bg="#ECF0F1")
         win.wait_visibility() # espera que a janela fique visível para bloquear o clique em outras janelas
         win.grab_set() # garante que os cliques fiquem apenas aqui quando a janela abrir
         
-        #Exibe o label para editar tarefa
+        # Exibe o label para editar tarefa
         tk.Label(win, text=f"Editando Tarefa T{tarefa.id}", font=("Helvetica", 12, "bold"), bg="#ECF0F1").pack(pady=15)
         
-        #Mostra o tempo restante
+        # Mostra o tempo restante
         tk.Label(win, text="Tempo Restante (Ticks):", bg="#ECF0F1").pack()
         entry_tempo = tk.Entry(win, justify='center')
         entry_tempo.insert(0, str(tarefa.tempoCorrido))
@@ -316,13 +354,13 @@ class InterfaceSimulador:
         # Se está finalizada, desative
         if esta_finalizada: entry_tempo.config(state="disabled")
 
-        #Mostra a prioridade estática
+        # Mostra a prioridade estática
         tk.Label(win, text="Prioridade Estática:", bg="#ECF0F1").pack()
         entry_prio = tk.Entry(win, justify='center')
         entry_prio.insert(0, str(tarefa.prioridadeEstatica))
         entry_prio.pack(pady=(0, 15))
 
-         #Mostra o quantum de ingresso
+        # Mostra o quantum de ingresso
         tk.Label(win, text="Tempo de ingresso", bg="#ECF0F1").pack()
         entry_nascimento = tk.Entry(win, justify='center')
         entry_nascimento.insert(0, str(tarefa.tempoDeIngresso))
@@ -335,14 +373,15 @@ class InterfaceSimulador:
         # Variável para controlar se vamos suspender ou acordar a tarefa
         esta_suspensa = tarefa in self.engine.estado_atual.fila_suspensas
 
+        # # Método que é acionado quando o botão de suspender tarefa é clicado
         def alternar_suspensao():
             estado_atual = self.engine.estado_atual
             
             if esta_suspensa:
                 # Acordar: usar o novo método sincronizado
                 estado_atual.acordar_tarefa(tarefa)
-                #Essa condição é necessária para garantir que a atualização não rode mais um estado em suspenso, pois ele atualiza até o ultimo snapshot, que era antes da mudança
-                #O tick atual vai refletir o intervalo, ou seja, o estado do tick T representa o que rodará durante [T, T+1), então a mudança tem que refletir nesse intervalo, e não no próximo tick
+                # Essa condição é necessária para garantir que a atualização não rode mais um estado em suspenso, pois ele atualiza até o ultimo snapshot, que era antes da mudança
+                # O tick atual vai refletir o intervalo, ou seja, o estado do tick T representa o que rodará durante [T, T+1), então a mudança tem que refletir nesse intervalo, e não no próximo tick
                 if self.engine.historico_estados:
                     if self.engine.historico_estados[-1].relogio_global == self.engine.estado_atual.relogio_global: #atuliza o ultimo estado para refletir a mudança
                         self.engine.historico_estados[-1] = self.engine.estado_atual.clonar_estado()
@@ -358,6 +397,7 @@ class InterfaceSimulador:
             self.atualizar_tela()
             win.destroy()
 
+        # Método que é acionado quando o botão de forçar a finalização da tarefa é clicado
         def forcar_finalizacao():
             # Tira das CPUs
             for cpu in self.engine.estado_atual.cpus:
@@ -385,6 +425,7 @@ class InterfaceSimulador:
             win.destroy()
             messagebox.showinfo("Sucesso", f"Tarefa T{tarefa.id} foi encerrada à força!")
 
+        # Método que é acionado quando o botão de reviver a tarefa é clicado
         def reviver_tarefa():
             estado_atual = self.engine.estado_atual
             config = self.engine.config
@@ -427,6 +468,7 @@ class InterfaceSimulador:
             tk.Button(win, text=texto_botao_suspender, bg=cor_botao_suspender, fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=alternar_suspensao).pack(fill=tk.X, padx=30, pady=5)
             tk.Button(win, text="Forçar Finalização", bg="#C0392B", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=forcar_finalizacao).pack(fill=tk.X, padx=30, pady=5)
 
+        # Método que é acionado quando o botão de salvar alterações da edição da tarefa é clicado
         def salvar_alteracoes():
             try:
                 
@@ -467,9 +509,9 @@ class InterfaceSimulador:
 
         # Só mostra o botão de salvar se a tarefa NÃO estiver morta
         if not esta_finalizada:
-            tk.Button(win, text="💾 Salvar Valores Manuais", bg="#27AE60", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=salvar_alteracoes).pack(pady=(10, 0))
+            tk.Button(win, text="Salvar Valores Manuais", bg="#27AE60", fg="white", font=("Helvetica", 10, "bold"), relief="flat", command=salvar_alteracoes).pack(pady=(10, 0))
 
-
+    # Método que atualiza todos os elementos da tela com base no SimuladorEngine
     def atualizar_tela(self):
         self.ax.set_title(f"Execução - {self.engine.config.algoritmoEscalomento}", fontsize=14, fontweight="bold", color="#2C3E50") # atualiza o título do gráfico para refletir o algoritmo atual
         # Declara a variável estado puxando da engine
@@ -532,6 +574,7 @@ class InterfaceSimulador:
         # Manda desenhar o gráfico com os dados atualizados
         self.desenhar_gantt()
 
+    # Método que limpa o gráfico 
     def desenhar_gantt_vazio(self):
         self.ax.clear()
         self.ax.set_title("Gráfico de Gantt - Aguardando Configuração", fontsize=14, fontweight="bold", color="#2C3E50")
@@ -539,6 +582,7 @@ class InterfaceSimulador:
         self.ax.set_yticks([])
         self.canvas.draw()
 
+    # Método que renderiza no gŕafico o histórico de execução das tarefas
     def desenhar_gantt(self):
         self.ax.clear()
         #Pega o estado atual para mostrar a serie de tempo

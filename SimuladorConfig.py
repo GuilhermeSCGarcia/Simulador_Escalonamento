@@ -1,9 +1,17 @@
+'''
+CLASSE: SimuladorConfig
+
+Atua como a entre a leitura dos dados (CarregarConfig) de um arquiivo .txt e o motor do simulador.
+A responsabilidade desta classe é inicializar os parâmetros globais do sistema operacional 
+(Algoritmo, Quantum, Quantidade de CPUs) e preparar a lista definitiva de tarefas e 
+processadores físicos que serão entregues para a Engine rodar.
+'''
+
 from CarregarConfig import CarregarConfig
 from TCB import TCB
 from Estados import EstadosTarefa
 from CPU import CPU
 
-#Essa classe carrega as configurações iniciais do simulador, usa a classe CarregarConfig, que lê o arquivo de texto
 class SimuladorConfig:
     algoritmoEscalomento : str #algoritmo escolhido
     quantum: int #duração do quantum
@@ -19,18 +27,8 @@ class SimuladorConfig:
         self.algoritmoEscalomento = configGeral["algoritmo_escalonamento"]
         self.quantum = configGeral["quantum"]
         self.qtde_cpus = configGeral["qtde_cpus"]
-        self.carregarTarefas(configParse.getlistaTarefas()) #método para carregar a lista de tarefas inicias
+        self.listaTarefasCarregadas = configParse.getlistaTarefas().copy()
         self.criarCPUS()  #método para criar a lista de cpu's iniciais
-        
-    def carregarTarefas(self,listaTarefas: list): # método para carregar as tarefas, para cada tarefa atribui-se uma TCB. Verifica se existe id repetido
-        ids_vistos = set()
-        for tarefa in listaTarefas:
-            if tarefa.id in ids_vistos:
-                # Se o id já existir, lançar erro
-                raise ValueError("Arquivo inválido, id repetido")
-            ids_vistos.add(tarefa.id)
-
-        self.listaTarefasCarregadas = listaTarefas.copy()
         
                    
     def criarCPUS(self): # método para criar a lista das cpus do sistema, levando em consideração o quantidade de cpus passada na configuração no txt

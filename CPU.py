@@ -1,3 +1,11 @@
+'''
+CLASSE: CPU
+
+Esta classe mantém um modelo para a CPU usada no sistema
+Responsável por armazenar o estado atual do processador, registrar qual tarefa (TCB) 
+está sendo executada no momento e contabilizar o tempo total de atividade para futuros 
+'''
+
 from Estados import EstadosCPU
 from TCB import TCB
 from dataclasses import dataclass, field

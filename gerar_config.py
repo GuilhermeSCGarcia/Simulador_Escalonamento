@@ -123,7 +123,6 @@ def main() -> int:
             # Campo listaEvento: mantenho como '[]' (string) para compatibilidade com o parser atual.
             f.write(f"{task_id};{cor};{ingresso};{tempo_total};{prioridade};[]\n")
 
-    print(f"Gerado: {args.out} (tarefas={args.n}, cpus={args.cpus}, alg={args.alg}, quantum={args.quantum})")
     return 0
 
 

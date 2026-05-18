@@ -1,3 +1,10 @@
+'''
+ENUMERAÇÕES: EstadosTarefa e EstadosCPU
+
+Centraliza as constantes de estado do sistema, espelhando o ciclo de vida real de 
+processos e processadores em um Sistema Operacional.
+'''
+
 from enum import Enum
 
 class EstadosTarefa(Enum):

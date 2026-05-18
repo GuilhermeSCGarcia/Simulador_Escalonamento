@@ -1,9 +1,16 @@
+'''
+MÓDULO: Escalonadores 
+
+Este módulo é o "Cérebro" de decisão do Sistema operacional. Ele implementa os algoritmos de escalonamento 
+que decidem qual tarefa ganha o direito de usar a CPU em um determinado momento.
+Utiliza herança e polimorfismo para garantir que qualquer novo algoritmo criado no futuro 
+siga o mesmo padrão da classe base, facilitando a expansão do simulador.
+'''
+
 import random
 from abc import ABC, abstractmethod
 
 from TCB import TCB
-
-
 
 # Classe base, interface que tem que ser implementada por cada classe que implementa um algoritmo de escalonador
 class EscalonadorBase(ABC):
@@ -22,14 +29,11 @@ class EscalonadorSRTF(EscalonadorBase):
             random.random() # Sorteio Aleatório
         ))
 
-        if(len(candidatos) > 1):
-            motivo = self.motivo_de_escolha(candidatos[0], candidatos[1])
-            print(f"Motivo da escolha: {motivo}")
-
-
+        # Retorna o primeiro elemento da lista ordenada
         return candidatos[0] if len(candidatos) > 0 else None
     
-    def motivo_de_escolha(self,t1 : TCB, t2 : TCB) -> int:
+    # Verifica o motivo de escolha das tarefas
+    def motivo_de_escolha(self,t1 : TCB, t2 : TCB) -> str:
         if t1.tempoCorrido != t2.tempoCorrido:
             return "Menor tempo restante"
         elif t1.estavaRodando != t2.estavaRodando:
@@ -53,14 +57,12 @@ class EscalonadorPRIOP(EscalonadorBase):
             t.tempoTotal,               # Menor duração
             random.random()             # Sorteio
         ))
-        if(len(candidatos) > 1):
-            motivo = self.motivo_de_escolha(candidatos[0], candidatos[1])
-            print(f"Motivo da escolha: {motivo}")
-            
+    
         return candidatos[0] if len(candidatos) > 0 else None    
 
 
-    def motivo_de_escolha(self,t1 : TCB, t2 : TCB) -> int:
+    # Verifica o motivo de escolha das tarefas
+    def motivo_de_escolha(self,t1 : TCB, t2 : TCB) -> str:
         if t1.prioridadeEstatica != t2.prioridadeEstatica:
             return "Maior prioridade"
         elif t1.estavaRodando != t2.estavaRodando:
