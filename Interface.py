@@ -125,9 +125,28 @@ class InterfaceSimulador:
         self.fig.patch.set_facecolor('#F8F9FA') 
         self.ax.set_facecolor('#FFFFFF') 
         
-        # Integração: Converte o plot do Matplotlib em um widget utilizável pelo Tkinter
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_grafico) 
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
+        # Converte o plot do MatPlotLib em um gráfico com scroll horizontal
+        self.frame_scroll_grafico = tk.Frame(self.frame_grafico, bg="white")
+        self.frame_scroll_grafico.pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
+
+        self.canvas_scroll_grafico = tk.Canvas(self.frame_scroll_grafico, bg="white", highlightthickness=0)
+        self.canvas_scroll_grafico.grid(row=0, column=0, sticky="nsew")
+
+        self.scroll_y_grafico = ttk.Scrollbar(self.frame_scroll_grafico, orient="vertical", command=self.canvas_scroll_grafico.yview)
+        self.scroll_y_grafico.grid(row=0, column=1, sticky="ns")
+
+        self.scroll_x_grafico = ttk.Scrollbar(self.frame_scroll_grafico, orient="horizontal", command=self.canvas_scroll_grafico.xview)
+        self.scroll_x_grafico.grid(row=1, column=0, sticky="ew")
+
+        self.frame_scroll_grafico.grid_rowconfigure(0, weight=1)
+        self.frame_scroll_grafico.grid_columnconfigure(0, weight=1)
+
+        self.canvas_scroll_grafico.configure(xscrollcommand=self.scroll_x_grafico.set, yscrollcommand=self.scroll_y_grafico.set)
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.canvas_scroll_grafico)
+        self.widget_grafico = self.canvas.get_tk_widget()
+
+        self.janela_grafico = self.canvas_scroll_grafico.create_window((0, 0), window=self.widget_grafico, anchor="nw")
 
         # Sub-Painel Inferior: Tabela de Tarefas/CPUs 
         self.frame_tabela = tk.Frame(self.paned_window, bg="white", padx=10, pady=10) 
@@ -277,7 +296,7 @@ class InterfaceSimulador:
         try:
             filepath = filedialog.asksaveasfilename(defaultextension=".png", title="Salvar Gráfico de Gantt", filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg"), ("SVG", "*.svg")])
             if filepath:
-                self.fig.savefig(filepath)
+                self.fig.savefig(filepath, bbox_inches="tight")
                 messagebox.showinfo("Sucesso", f"Gráfico salvo com sucesso em:\n{filepath}")
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao salvar a imagem:\n{str(e)}")
@@ -295,7 +314,6 @@ class InterfaceSimulador:
             #limpar figura anterior quando carregar um novo arquivo, para evitar que a simulação anterior atrapalhe a nova
             if self.fig:
                 plt.close(self.fig)
-            
             
             estado_inicial = SimuladorEstado(config.listaCPU, config.listaTarefasCarregadas, config.quantum) #prepra o estado inicial
             self.engine = SimuladorEngine(config, estado_inicial) #prepara a engine do simulador
@@ -655,7 +673,27 @@ class InterfaceSimulador:
         self.ax.set_axisbelow(True) 
         
         tick_maximo = max(10, estado_atual.relogio_global + 2)
-        self.ax.set_xticks(range(0, tick_maximo + 1))
+
+        # Variaveis para aumentar o comprimento do gráfico conforme o tempo cresce
+        largura_minima = 12
+        largura_por_tick = 0.35
+        largura_maxima = 80
+
+        altura_minima = 8
+        altura_por_tarefa = 0.35
+        altura_maxima = 30
+
+        # Define largura e altura da figura para fazer o scroll
+        largura_figura = min(max(largura_minima, tick_maximo * largura_por_tick), largura_maxima
+)
+        altura_figura = min(max(altura_minima, len(tarefas_ordenadas) * altura_por_tarefa),altura_maxima)
+
+        # Altera o tamanho da figura do matplotlib
+        self.fig.set_size_inches(largura_figura, altura_figura)
+
+        # Evita mostrar todos os números do tick na escala caso haja muitos ticks
+        intervalo_tick = max(1, tick_maximo // 30)
+        self.ax.set_xticks(range(0, tick_maximo + 1, intervalo_tick))
         self.ax.set_xlim(0, tick_maximo)
 
         legend_elements = [
@@ -667,4 +705,24 @@ class InterfaceSimulador:
         ]
         self.ax.legend(handles=legend_elements, loc='upper right', fontsize=7)
 
+        self.fig.tight_layout()
         self.canvas.draw()
+
+        # Converte polegadas do matplotlib em pxels para o tkinter
+        largura_px = int(self.fig.get_figwidth() * self.fig.dpi)
+        altura_px = int(self.fig.get_figheight() * self.fig.dpi)
+
+        self.widget_grafico.configure(width=largura_px, height=altura_px)
+
+        self.canvas_scroll_grafico.itemconfigure(
+            self.janela_grafico,
+            width=largura_px,
+            height=altura_px
+        )
+
+        self.canvas_scroll_grafico.configure(
+            scrollregion=self.canvas_scroll_grafico.bbox("all")
+        )
+
+        self.canvas_scroll_grafico.xview_moveto(0)
+        self.canvas_scroll_grafico.yview_moveto(0)
