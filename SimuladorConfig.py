@@ -21,7 +21,9 @@ class SimuladorConfig:
         self.listaTarefasCarregadas = [] #lista de tarefas carregadas que sera usada pelo SimuladorEstado
         self.listaCPU = [] #lista de cpus que sera usado pelo SimuladorEstado
         configParse = CarregarConfig() #cria um objeto que lê o arquivo txt
-        print(configParse.carregarArquivoTXT(txt)) #um print para saber se o arquivo foi lido com sucesso
+        resultado = configParse.carregarArquivoTXT(txt)
+        if resultado != "arquivo aberto":
+            raise ValueError(resultado)
         configParse.carregarParametros() # método para ler o arquivo txt
         configGeral = configParse.getConfigSim() # pega as configurações gerais
         self.algoritmoEscalomento = configGeral["algoritmo_escalonamento"]

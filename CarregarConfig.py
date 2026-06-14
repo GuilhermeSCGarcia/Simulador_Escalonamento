@@ -49,33 +49,53 @@ class CarregarConfig:
         try:
             for i, linhas in enumerate(self.f): # loop em todas as linhas do arquivo
                 linhas = linhas.strip() # remove espaços
-                if linhas: # testa a linha para ver se não é vazia
-                    if i == 0:
-                        conteudo = linhas.split(";") # faz uma lista com os elementos 
-                        self.configSim.update({"algoritmo_escalonamento" : "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
-                                            "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
-                                                "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])})
-                    else:
-                        conteudo = linhas.split(";") # faz uma lista com elementos separados por ":"
-                        tarefa = TCB(
-                            id = self.parsetarefaId(conteudo[0]), # trata as ids em especial, se a entrada for um número direto ou uma
-                            cor = conteudo[1],                        
-                            tempoDeIngresso = -1 if conteudo[2] == "" else int(conteudo[2]),     
-                            tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
-                            tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
-                            prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
-                            listaEvento = conteudo[5]               
-                        )
-                        self.listTarefas.append(tarefa)
-            self.checarParametros(self.listTarefas) #chama a função para checar os parametros das tarefas e preencher os vazios
-        except Exception as e:
-            print(f"Erro ao carregar parâmetros: {e}")
 
-        # Fecha o arquivo após o parse para evitar vazamento de descritor
-        try:
-            self.f.close()
-        except Exception:
-            pass
+                if not linhas:
+                    continue
+                
+                numero_linha = i + 1
+                conteudo = linhas.split(";")
+
+                if i == 0:
+                    if len(conteudo) != 3:
+                        raise ValueError(
+                            f"Erro na linha {numero_linha}: a primeira linha deve ter o formato "
+                            "'ALGORITMO;QUANTUM;CPUS'. Exemplo: SRTF;2;2"
+                        )
+
+                    self.configSim.update({
+                        "algoritmo_escalonamento": "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
+                        "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
+                        "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])
+                    })
+                else:
+                    if len(conteudo) != 6:
+                        raise ValueError(
+                            f"Erro na linha {numero_linha}: cada tarefa deve ter 6 campos separados por ponto e vírgula.\n"
+                            "Formato esperado: id;cor;tempoDeIngresso;tempoTotal;prioridade;listaEventos\n"
+                            "Exemplo: 1;FF6B6B;0;10;3;[]"
+                        )
+
+                    tarefa = TCB(
+                        id = self.parsetarefaId(conteudo[0]), # trata as ids em especial, se a entrada for um número direto ou uma
+                        cor = conteudo[1],                        
+                        tempoDeIngresso = -1 if conteudo[2] == "" else int(conteudo[2]),     
+                        tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
+                        tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
+                        prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
+                        listaEvento = conteudo[5]               
+                    )
+
+                    self.listTarefas.append(tarefa)
+
+            self.checarParametros(self.listTarefas) #chama a função para checar os parametros das tarefas e preencher os vazios
+
+        finally:
+            # Fecha o arquivo após o parse para evitar vazamento de descritor
+            try:
+                self.f.close()
+            except Exception:
+                pass
         
     # Método que retorna as configurações do simulador
     def getConfigSim(self) -> dict: 
