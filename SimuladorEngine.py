@@ -30,7 +30,7 @@ class SimuladorEngine:
         self.estado_atual = estado_inicial # Salva o estado inicial
         self.estado_zero = None # Salva o estado zero para poder restaurar depois
         self.historico_estados = [] # Inicia como lista vaziaF
-        self.escalonador = fabrica_de_escalonadores(self.config.algoritmoEscalomento) # Seleciona escalonador
+        self.escalonador = fabrica_de_escalonadores(self.config.algoritmoEscalomento, self.config.alpha) # Seleciona escalonador
         self.quantumTotal = self.config.quantum # Salva o quantum total do sistema
         self.prepararSimulador() # Prepara o simulador, colocando as tarefas que entram no tempo 0 na fila de prontos e chamando o escalonador para definir quais tarefas vão para cada cpu
     
@@ -84,6 +84,10 @@ class SimuladorEngine:
         if p.atualTarefa is not None: #se aquela cpu já tem uma tarefa, ela também é candidata
             candidatos.append(p.atualTarefa)
 
+        # Adiciona o atributo como true para a tarefa que estava no cpu
+        for tarefa in candidatos:
+            tarefa.estavaRodando = tarefa == p.atualTarefa
+
         t_escolhida = self.escalonador.ordenar_candidatos(candidatos) #o escalonador seleciona a nova tarefa para aquela cpu, com base no algoritmo selecionado
 
         if t_escolhida is None: #se nenhuma tarefa foi escolhida, pela lista estar vazia ou a tarefa da cpu antiga ter tido a tarefa finalizada a cpu é desligada
@@ -97,6 +101,7 @@ class SimuladorEngine:
         # Se a mesma tarefa continua escolhida, só reseta quantum e mantém rodando
         if t_escolhida == p.atualTarefa:
             t_escolhida.quatum_dado = 0
+            t_escolhida.tempoEspera = 0
             return
 
         # Se havia tarefa executando e ela perdeu a CPU, volta para prontos
@@ -113,6 +118,7 @@ class SimuladorEngine:
         #processo para configurar a cpu com a tarefa escolhida
         p.atualTarefa = t_escolhida #atribui a tarefa escolhida para a cpu
         p.atualTarefa.quatum_dado = 0 #reseta o quantum dado para a tarefa escolhida, pois ela está começando a rodar agora
+        p.atualTarefa.tempoEspera = 0 #reseta o tempo de espera se a tarefa escolhida entrar na cpu
         p.atualTarefa.estado = EstadosTarefa.EXECUTANDO #atualiza o estado da tarefa escolhida para executando
         p.atualTarefa.idCpu = p.id #atualiza a cpu associada a tarefa escolhida para a cpu atual
 
@@ -126,7 +132,11 @@ class SimuladorEngine:
         for p in self.estado_atual.cpus:
             if p.atualTarefa is not None:
                 candidatos.append(p.atualTarefa)
-        
+
+        # Verifica se a tarefa já estava executando na cpu
+        for tarefa in candidatos:
+            tarefa.estavaRodando = tarefa.idCpu != -1
+
         escolhidos : list[TCB] = []
 
         for i in range(len(self.estado_atual.cpus)):
@@ -134,12 +144,14 @@ class SimuladorEngine:
             if t_escolhida is not None:
                 escolhidos.append(t_escolhida)
                 candidatos.remove(t_escolhida)
-        
+
+
         # 1) Mantém as tarefas já executando que continuam escolhidas.
         # 2) Para CPUs que precisam trocar (ou estão ociosas), realoca e preenche com o que sobrar em `escolhidos`.
 
         for p in self.estado_atual.cpus:
             if p.atualTarefa in escolhidos:
+                p.atualTarefa.tempoEspera = 0
                 escolhidos.remove(p.atualTarefa)
                 continue
 
@@ -169,6 +181,7 @@ class SimuladorEngine:
                     p.atualTarefa.estado = EstadosTarefa.EXECUTANDO
                     p.atualTarefa.idCpu = p.id
                     p.atualTarefa.quatum_dado = 0
+                    p.atualTarefa.tempoEspera = 0
                     p.estado = EstadosCPU.LIGADO
             else:
                 p.estado = EstadosCPU.DESLIGADO
@@ -177,6 +190,7 @@ class SimuladorEngine:
     # Método que controla o fluxo de avançar o tempo do sistema
     def avancar_tick(self) -> None: 
         self.resetarMarcadorRandomico()
+        self.atualizar_tempo_espera()
         self.processarTempoCPU()
         self.processar_cpus()
         self.estado_atual.relogio_global = self.estado_atual.relogio_global + 1
@@ -243,3 +257,10 @@ class SimuladorEngine:
         self.estado_atual = self.estado_zero.clonar_estado()
         self.historico_estados = [self.estado_atual.clonar_estado()] #Restaura o estado zero diretamente da engine, para garantir que tudo volte ao início corretamente
 
+    def atualizar_tempo_espera(self) -> None:
+        for tarefa in self.estado_atual.fila_prontos:
+            tarefa.tempoEspera += 1
+
+        for cpu in self.estado_atual.cpus:
+            if cpu.atualTarefa is not None:
+                cpu.atualTarefa.tempoEspera = 0

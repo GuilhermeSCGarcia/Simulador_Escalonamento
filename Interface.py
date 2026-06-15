@@ -67,7 +67,7 @@ class InterfaceSimulador:
 
         # Dropdown para troca de algoritmo em "Hot Swap" (Tempo de execução)
         tk.Label(self.frame_controles, text="Algoritmo Atual:", font=("Helvetica", 10, "bold"), bg="#2C3E50", fg="white").pack(anchor="w", pady=(10, 0))
-        self.combo_algoritmo = ttk.Combobox(self.frame_controles, values=["SRTF", "PRIOP"], state="disabled")
+        self.combo_algoritmo = ttk.Combobox(self.frame_controles, values=["SRTF", "PRIOP", "PRIOPEnv"], state="disabled")
         self.combo_algoritmo.pack(fill=tk.X, pady=(2, 10))
         self.combo_algoritmo.bind("<<ComboboxSelected>>", self.acao_mudar_algoritmo) # Aciona a troca na Engine assim que o usuário clica numa opção
         
@@ -239,7 +239,7 @@ class InterfaceSimulador:
         # Atualiza a string no config (para o título do gráfico atualizar)
         self.engine.config.algoritmoEscalomento = novo_alg
         # Substitui a instância do escalonador em tempo real!
-        self.engine.escalonador = fabrica_de_escalonadores(novo_alg)
+        self.engine.escalonador = fabrica_de_escalonadores(novo_alg, self.engine.config.alpha)
         
         self.atualizar_tela() # Atualiza para mudar o título do gráfico instantaneamente
 

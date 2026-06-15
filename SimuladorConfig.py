@@ -16,6 +16,7 @@ class SimuladorConfig:
     algoritmoEscalomento : str #algoritmo escolhido
     quantum: int #duração do quantum
     qtde_cpus: int #quantidade de cpus
+    alpha: int #Parâmetro alpha de envelhecimento
 
     def __init__(self,txt: str):
         self.listaTarefasCarregadas = [] #lista de tarefas carregadas que sera usada pelo SimuladorEstado
@@ -29,6 +30,7 @@ class SimuladorConfig:
         self.algoritmoEscalomento = configGeral["algoritmo_escalonamento"]
         self.quantum = configGeral["quantum"]
         self.qtde_cpus = configGeral["qtde_cpus"]
+        self.alpha = configGeral["alpha"]
         self.listaTarefasCarregadas = configParse.getlistaTarefas().copy()
         self.criarCPUS()  #método para criar a lista de cpu's iniciais
         

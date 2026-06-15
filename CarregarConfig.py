@@ -30,7 +30,8 @@ class CarregarConfig:
         self.f = None # Inicia o arquivo como none
         self.configSim = {"algoritmo_escalonamento" : "STFR", #Valores padrão de carregamento
                      "quantum": 2,
-                     "qtde_cpus": 4
+                     "qtde_cpus": 4,
+                     "alpha": 1
                     }
         self.listTarefas = [] # Inicia a lista vazia
 
@@ -55,18 +56,25 @@ class CarregarConfig:
                 
                 numero_linha = i + 1
                 conteudo = linhas.split(";")
+                algoritmo = "STFR" if conteudo[0].upper() == "" else conteudo[0].upper()
 
                 if i == 0:
-                    if len(conteudo) != 3:
+                    if algoritmo == "PRIOPENV":
+                        if len(conteudo) != 4:
+                            raise ValueError(
+                                f"Erro na linha {numero_linha}: para o algoritmo PRIOPEnv, a primeira linha deve ter o formato "
+                                "'PRIOPEnv;QUANTUM;CPUS;ALPHA'. Exemplo: PRIOPEnv;5;2;1"
+                            )
+                    elif len(conteudo) != 3:
                         raise ValueError(
                             f"Erro na linha {numero_linha}: a primeira linha deve ter o formato "
                             "'ALGORITMO;QUANTUM;CPUS'. Exemplo: SRTF;2;2"
-                        )
-
+    )
                     self.configSim.update({
                         "algoritmo_escalonamento": "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
                         "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
-                        "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2])
+                        "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2]),
+                        "alpha": 1 if len(conteudo) == 3 or conteudo[3] == "" else int(conteudo[3])
                     })
                 else:
                     if len(conteudo) != 6:

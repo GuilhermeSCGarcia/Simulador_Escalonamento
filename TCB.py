@@ -23,3 +23,4 @@ class TCB:
     estavaRodando: bool = False # Atributo para desempate no escalonamento
     sofreu_sorteio: bool = False # Atributo para determinar se a tarefa foi escolhida com base no sorteio
     quatum_dado: int = 0
+    tempoEspera: int = 0 #Tempo que a tarefa passou na fila de prontos

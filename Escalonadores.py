@@ -74,13 +74,34 @@ class EscalonadorPRIOP(EscalonadorBase):
         else:
             t1.sofreu_sorteio = True
             return "Sorteio Aleatório"
+        
+class EscalonadorPRIOPEnv(EscalonadorBase):
+    alpha: int # Parametro alpha
+    def __init__(self, alpha: int):
+        self.alpha = alpha
+
+    def calcular_prioridade_efetiva(self, tarefa: TCB) -> int:
+        return tarefa.prioridadeEstatica + (self.alpha * tarefa.tempoEspera)
+
+    def ordenar_candidatos(self, candidatos: list[TCB]) -> TCB:
+        candidatos.sort(key=lambda t: (
+            -self.calcular_prioridade_efetiva(t), # Maior prioridade efetiva
+            -t.prioridadeEstatica,                # Maior prioridade estática
+            not t.estavaRodando,                  # Preferir quem já estava rodando
+            t.tempoDeIngresso,                    # Menor instante de ingresso
+            t.tempoTotal,                         # Menor duração
+            random.random()                       # Sorteio
+        ))
+
+        return candidatos[0] if len(candidatos) > 0 else None
 
     
 # Função que executa a classe correta com base no algoritmo selecionado no config.txt
-def fabrica_de_escalonadores(nome_algoritmo: str) -> EscalonadorBase:
+def fabrica_de_escalonadores(nome_algoritmo: str, alpha: int = 1) -> EscalonadorBase:
     algoritmo_disponiveis: dict = {
         "SRTF": EscalonadorSRTF(),
-        "PRIOP": EscalonadorPRIOP()
+        "PRIOP": EscalonadorPRIOP(),
+        "PRIOPENV": EscalonadorPRIOPEnv(alpha)
     }
 
     if nome_algoritmo.upper() in algoritmo_disponiveis:
