@@ -8,7 +8,7 @@ A descisão de usar uma classe pra carregar as configurações foi por modulariz
 
 import re
 
-from TCB import TCB
+from TCB import TCB, EventoTarefa
 
 CORES_SUGESTAO = [
     "FF6B6B",  # vermelho suave
@@ -69,7 +69,7 @@ class CarregarConfig:
                         raise ValueError(
                             f"Erro na linha {numero_linha}: a primeira linha deve ter o formato "
                             "'ALGORITMO;QUANTUM;CPUS'. Exemplo: SRTF;2;2"
-    )
+                        )
                     self.configSim.update({
                         "algoritmo_escalonamento": "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
                         "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
@@ -91,7 +91,7 @@ class CarregarConfig:
                         tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
                         tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
                         prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
-                        listaEvento = conteudo[5]               
+                        listaEvento = self.parseListaEventos(conteudo[5], numero_linha)             
                     )
 
                     self.listTarefas.append(tarefa)
@@ -157,7 +157,58 @@ class CarregarConfig:
             if t.tempoTotal == -1: #se o tempo total for vazio, atribui 10 no total e no corrido
                 t.tempoTotal = 10
                 t.tempoCorrido = 10
-            if t.prioridadeEstatica == -1: #se a prioridade estatica for vazia, atribui 5
+            if t.prioridadeEstatica == -1: # se a prioridade estatica for vazia, atribui 5
                 t.prioridadeEstatica = 5
-            
+        
 
+    # Método para pegar o valor passado no txt e transformar e uma litsa de EventoTarefa
+    def parseListaEventos(self, valor: str, numero_linha: int) -> list[EventoTarefa]:
+        valor = valor.strip()
+
+        # Verifca se o valor está vazio ou não tem nada na lista
+        if valor == "" or valor == "[]":
+            return[]
+            
+        # Verifica se os colchetes estão corretos
+        if valor.startswith("[") or valor.endswith("]"):
+            if not (valor.startswith("[") and valor.endswith("]")):
+                raise ValueError(
+                    f"Erro na linha {numero_linha}: lista de eventos com colchetes inválidos. "
+                    "Use ML01:00,MU01:05 ou [ML01:00,MU01:05]."
+                )
+
+            # Remove colchetes
+            valor = valor[1:-1].strip()
+
+        if valor == "":
+            return []
+            
+        eventos: list[EventoTarefa] = []
+
+        # Percorre cada um dos elementos da lista de eventos 
+        for ordem, evento in enumerate(valor.split(",")):
+            evento = evento.strip().upper()
+
+            # Regex para separar cada elemento das informações do mutex
+            resultado = re.fullmatch(r"(ML|MU)(\d+):(\d+)", evento)
+
+            if resultado is None:
+                raise ValueError(
+                    f"Erro na linha {numero_linha}: evento inválido '{evento}'. "
+                    "Formato esperado: MLxx:tempo ou MUxx:tempo. Exemplo: ML01:00"
+                )
+                
+            tipo = resultado.group(1)
+            mutex_id = int(resultado.group(2))
+            tempo = int(resultado.group(3))
+
+            # Cria evento e adiciona na lista
+            eventos.append(EventoTarefa(
+                tipo = tipo,
+                mutex_id = mutex_id,
+                tempo = tempo,
+                ordem = ordem
+            ))
+
+        return eventos
+            

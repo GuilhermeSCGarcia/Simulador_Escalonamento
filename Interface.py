@@ -262,7 +262,12 @@ class InterfaceSimulador:
 
     # Método que é acionado quando o botão de execuutar tuudo é clicado
     def acao_executar_tudo(self):
-        if len(self.engine.estado_atual.fila_suspensas) > 0:
+        suspensas_manuais = [
+            t for t in self.engine.estado_atual.fila_suspensas
+            if getattr(t, "motivoBloqueio", "") != "MUTEX"
+        ]
+
+        if len(suspensas_manuais) > 0:
             messagebox.showwarning("Aviso", "Existem tarefas bloqueadas. Por favor, acorde ou remova as tarefas bloqueadas para executar até o fim.")
             return
         if self.engine.estado_atual.simulacao_finalizada():
@@ -640,8 +645,26 @@ class InterfaceSimulador:
 
             for tarefa_suspensa in getattr(foto_execucao, 'fila_suspensas', []):
                 y_pos = mapa_y[tarefa_suspensa.id]
-                # Requisito 2.1c: Tarefa suspensa com cor preta
-                self.ax.barh(y=y_pos, width=1, left=tick, color='black', edgecolor='white', height=0.6)
+
+                if getattr(tarefa_suspensa, "motivoBloqueio", "") == "MUTEX":
+                    self.ax.barh(
+                        y=y_pos,
+                        width=1,
+                        left=tick,
+                        color="#6C3483",
+                        edgecolor="white",
+                        hatch="///",
+                        height=0.6
+                    )
+                else:
+                    self.ax.barh(
+                        y=y_pos,
+                        width=1,
+                        left=tick,
+                        color="black",
+                        edgecolor="white",
+                        height=0.6
+                    )
 
         for foto_estado in todas_fotos_do_tempo:
             tick = foto_estado.relogio_global
@@ -650,6 +673,52 @@ class InterfaceSimulador:
                     y_pos = mapa_y[tf.id]
                     self.ax.plot(tick, y_pos - 0.35, marker='X', color='#E74C3C', markersize=8)
                     tarefas_concluidas.add(tf.id)
+
+        eventos_gantt = getattr(estado_atual, "eventos_gantt", [])
+
+        for evento_gantt in eventos_gantt:
+            tarefa_id = evento_gantt["tarefa_id"]
+
+            if tarefa_id not in mapa_y:
+                continue
+
+            tick_evento = evento_gantt["tick"]
+            y_pos = mapa_y[tarefa_id]
+            tipo = evento_gantt["tipo"]
+            mutex_id = evento_gantt["mutex_id"]
+
+            if tipo == "ML":
+                cor = "#8E44AD" if evento_gantt.get("bloqueou", False) else "#C0392B"
+                marcador = "P"
+                deslocamento_y = 0.42
+                texto = f"{mutex_id}"
+            else:
+                cor = "#27AE60"
+                marcador = "o"
+                deslocamento_y = -0.42
+                texto = f"{mutex_id}"
+
+            self.ax.plot(
+                tick_evento,
+                y_pos + deslocamento_y,
+                marker=marcador,
+                color=cor,
+                markersize=8,
+                linestyle="None",
+                zorder=5
+            )
+
+            self.ax.text(
+                tick_evento + 0.08,
+                y_pos + deslocamento_y,
+                texto,
+                fontsize=7,
+                fontweight="bold",
+                color=cor,
+                va="center",
+                zorder=6,
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.75, pad=1)
+            )
 
         self.ax.xaxis.grid(True, linestyle='--', alpha=0.7)
         self.ax.set_axisbelow(True) 
@@ -661,9 +730,13 @@ class InterfaceSimulador:
         legend_elements = [
             Line2D([0], [0], color='#2980B9', marker='v', linestyle='None', markersize=8, label='Início (v)'),
             Line2D([0], [0], color='#E74C3C', marker='X', linestyle='None', markersize=8, label='Término (X)'),
-            Line2D([0], [0], color='#F39C12', marker='*', linestyle='None', markersize=8, label='Sorteiro (*)'),
-            plt.Rectangle((0,0),1,1, facecolor="white", edgecolor="black", label='Fila de Prontos'),
-            plt.Rectangle((0,0),1,1, facecolor="black", edgecolor="white", label='Suspensa'), 
+            Line2D([0], [0], color='#F39C12', marker='*', linestyle='None', markersize=8, label='Sorteio (*)'),
+            Line2D([0], [0], color='#C0392B', marker='P', linestyle='None', markersize=8, label='Lock ML'),
+            Line2D([0], [0], color='#8E44AD', marker='P', linestyle='None', markersize=8, label='Lock ML bloqueou'),
+            Line2D([0], [0], color='#27AE60', marker='o', linestyle='None', markersize=8, label='Unlock MU'),
+            plt.Rectangle((0,0), 1, 1, facecolor="white", edgecolor="black", label='Fila de Prontos'),
+            plt.Rectangle((0,0), 1, 1, facecolor="black", edgecolor="white", label='Suspensa Manual/I/O'),
+            plt.Rectangle((0,0), 1, 1, facecolor="#6C3483", edgecolor="white", hatch="///", label='Suspensa por Mutex'),
         ]
         self.ax.legend(handles=legend_elements, loc='upper right', fontsize=7)
 

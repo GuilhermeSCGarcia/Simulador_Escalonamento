@@ -58,6 +58,14 @@ class SimuladorEngine:
                     self.estado_atual.finalizar_tarefa(p.atualTarefa, p)
                     self.escalonar_cpu(p)
             if p.atualTarefa is not None:
+                bloqueou = self.processar_eventos_tarefa(p, p.atualTarefa)
+
+                if bloqueou and p.atualTarefa is None:
+                    continue
+
+                if p.atualTarefa is None:
+                    continue
+
                 p.atualTarefa.quatum_dado = p.atualTarefa.quatum_dado + 1
                 if p.atualTarefa.tempoCorrido <= 0:
                     self.estado_atual.finalizar_tarefa(p.atualTarefa, p)
@@ -102,6 +110,7 @@ class SimuladorEngine:
         if t_escolhida == p.atualTarefa:
             t_escolhida.quatum_dado = 0
             t_escolhida.tempoEspera = 0
+            self.processar_eventos_tarefa(p, t_escolhida)
             return
 
         # Se havia tarefa executando e ela perdeu a CPU, volta para prontos
@@ -121,6 +130,7 @@ class SimuladorEngine:
         p.atualTarefa.tempoEspera = 0 #reseta o tempo de espera se a tarefa escolhida entrar na cpu
         p.atualTarefa.estado = EstadosTarefa.EXECUTANDO #atualiza o estado da tarefa escolhida para executando
         p.atualTarefa.idCpu = p.id #atualiza a cpu associada a tarefa escolhida para a cpu atual
+        self.processar_eventos_tarefa(p, p.atualTarefa)
 
         
     #Esse método é um versão do escalonador para novas tarefas, pois quando cada tarefa nova chega nas CPU's, elas tem que ser comparadas com as tarefas
@@ -185,6 +195,8 @@ class SimuladorEngine:
                     p.estado = EstadosCPU.LIGADO
             else:
                 p.estado = EstadosCPU.DESLIGADO
+
+        self.processar_eventos_cpus_ativas()
 
 
     # Método que controla o fluxo de avançar o tempo do sistema
@@ -264,3 +276,117 @@ class SimuladorEngine:
         for cpu in self.estado_atual.cpus:
             if cpu.atualTarefa is not None:
                 cpu.atualTarefa.tempoEspera = 0
+
+    def tempo_executado_tarefa(self, tarefa: TCB) -> int:
+        return tarefa.tempoTotal - tarefa.tempoCorrido
+    
+    def processar_eventos_tarefa(self, cpu: CPU, tarefa: TCB) -> bool:
+        tempo_executado = self.tempo_executado_tarefa(tarefa)
+
+        eventos_do_tick = []
+
+        for evento in tarefa.listaEvento:
+            if evento.tempo == tempo_executado and evento.ordem not in tarefa.eventosExecutados:
+                eventos_do_tick.append(evento)
+
+        eventos_do_tick.sort(key=lambda evento: evento.ordem)
+
+        precisa_reescalonar_global = False
+
+        for evento in eventos_do_tick:
+            if evento.tipo == "ML":
+                bloqueou = self.executar_lock_mutex(cpu, tarefa, evento)
+
+                if bloqueou:
+                    return True
+
+            elif evento.tipo == "MU":
+                acordou_tarefa = self.executar_unlock_mutex(tarefa, evento)
+
+                if acordou_tarefa:
+                    precisa_reescalonar_global = True
+
+        if precisa_reescalonar_global:
+            self.escalonar_novas_tarefas()
+
+        return False
+    
+    def executar_lock_mutex(self, cpu: CPU, tarefa: TCB, evento) -> bool:
+        mutex = self.estado_atual.mutexes[evento.mutex_id]
+
+        tarefa.eventosExecutados.add(evento.ordem)
+
+        if mutex.dono == tarefa:
+            raise ValueError(
+                f"Tarefa T{tarefa.id} tentou travar novamente o mutex {evento.mutex_id}, "
+                "mas ela já é a dona desse mutex."
+            )
+
+        if mutex.dono is None:
+            mutex.dono = tarefa
+            self.registrar_evento_mutex(tarefa, evento, bloqueou=False)
+            return False
+
+        if all(t.id != tarefa.id for t in mutex.fila_espera):
+            mutex.fila_espera.append(tarefa)
+
+        tarefa.motivoBloqueio = "MUTEX"
+        tarefa.mutexBloqueado = evento.mutex_id
+
+        self.estado_atual.suspender_tarefa(tarefa)
+        self.registrar_evento_mutex(tarefa, evento, bloqueou=True)
+        self.escalonar_cpu(cpu)
+
+        return True
+    
+    def executar_unlock_mutex(self, tarefa: TCB, evento) -> bool:
+        mutex = self.estado_atual.mutexes[evento.mutex_id]
+
+        tarefa.eventosExecutados.add(evento.ordem)
+
+        if mutex.dono != tarefa:
+            raise ValueError(
+                f"Tarefa T{tarefa.id} tentou liberar o mutex {evento.mutex_id}, "
+                "mas ela não é a dona desse mutex."
+            )
+
+        if len(mutex.fila_espera) == 0:
+            mutex.dono = None
+            self.registrar_evento_mutex(tarefa, evento, acordou=False)
+            return False
+
+        proxima_tarefa = mutex.fila_espera.pop(0)
+
+        mutex.dono = proxima_tarefa
+
+        proxima_tarefa.motivoBloqueio = ""
+        proxima_tarefa.mutexBloqueado = None
+
+        self.estado_atual.acordar_tarefa(proxima_tarefa)
+        self.registrar_evento_mutex(tarefa, evento, acordou=True)
+
+        return True
+
+    def processar_eventos_cpus_ativas(self) -> None:
+        cpus_com_tarefas = []
+
+        for cpu in self.estado_atual.cpus:
+            if cpu.atualTarefa is not None:
+                cpus_com_tarefas.append((cpu, cpu.atualTarefa))
+
+        for cpu, tarefa in cpus_com_tarefas:
+            if cpu.atualTarefa == tarefa:
+                self.processar_eventos_tarefa(cpu, tarefa)
+
+    def registrar_evento_mutex(self, tarefa: TCB, evento, bloqueou=False, acordou=False) -> None:
+        if not hasattr(self.estado_atual, "eventos_gantt"):
+            self.estado_atual.eventos_gantt = []
+
+        self.estado_atual.eventos_gantt.append({
+            "tick": self.estado_atual.relogio_global,
+            "tarefa_id": tarefa.id,
+            "tipo": evento.tipo,
+            "mutex_id": evento.mutex_id,
+            "bloqueou": bloqueou,
+            "acordou": acordou,
+        })

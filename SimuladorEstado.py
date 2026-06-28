@@ -15,6 +15,7 @@ from TCB import TCB
 from CPU import CPU
 from Estados import EstadosCPU
 from Estados import EstadosTarefa
+from Mutex import Mutex
 
 class SimuladorEstado:
     relogio_global: int = 0 # Relógio do sistema
@@ -25,6 +26,8 @@ class SimuladorEstado:
     fila_suspensas: list[TCB] # Lista da fila de tarefas suspensas
     tarefas_futuras: list[TCB] # Lista de tarefas futuras
     tarefas_finalizadas: list[TCB] # Lista de tarefas finalizadas
+    mutexes: dict[int, Mutex] # Dicionário de mutex do estado atual
+    eventos_gantt: list
 
     def __init__(self, lista_cpus: list[CPU], lista_tarefas_carregadas: list[TCB],quantumTotal: int):
         self.relogio_global = 0 # Inicia relógio do sistema em zero
@@ -35,6 +38,8 @@ class SimuladorEstado:
         self.fila_suspensas = [] # Inicia fila de tarefas suspensas vazia
         self.tarefas_finalizadas = [] # Inicia fila de tarefas finalizadas vazia
         self.quantumTotal = quantumTotal #recebe o quantum total do sistema, criado pelo SimuladorConfig
+        self.mutexes = self.criar_mutexes(lista_tarefas_carregadas) # Cria dicionario de mutexes 
+        self.eventos_gantt = []
 
     def simulacao_finalizada(self) -> bool: # Método que retorna se a simulacao está finalizada
         if self.tarefas_futuras: # Verifiica se ainda existem tarefas futuras
@@ -101,3 +106,14 @@ class SimuladorEstado:
         if tarefa not in self.fila_prontos:
             self.fila_prontos.append(tarefa)
         tarefa.estado = EstadosTarefa.PRONTO
+    
+    # Função para adicionar na lista de mutexes 
+    def criar_mutexes(self, tarefas: list[TCB]) -> dict[int, Mutex]:    
+        mutexes: dict[int, Mutex] = {}
+
+        for tarefa in tarefas:
+            for evento in tarefa.listaEvento:
+                if evento.tipo in ("ML", "MU") and evento.mutex_id not in mutexes:
+                    mutexes[evento.mutex_id] = Mutex(id=evento.mutex_id)
+
+        return mutexes
