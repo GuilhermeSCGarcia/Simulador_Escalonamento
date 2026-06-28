@@ -11,9 +11,10 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class EventoTarefa:
     tipo: str        # ML(Solicitação) ou MU(Liberação)
-    mutex_id: int    # número do mutex
     tempo: int       # tempo relativo a execução da tarefa
     ordem: int       # posição no arquivo
+    duracao: int | None = None # Duração do E/S
+    mutex_id: int | None = None # id do mutex
 
 @dataclass
 class TCB:
@@ -34,3 +35,4 @@ class TCB:
     eventosExecutados: set[int] = field(default_factory=set) # Para não ficar executando o mutex
     motivoBloqueio: str = "" # Mutex ou IO
     mutexBloqueado: int | None = None # Id do mutex que bloqueou a tarefa
+    ioTempoTermina: int | None = None # Tick global em que a operação de E/S termina e gera IRQ

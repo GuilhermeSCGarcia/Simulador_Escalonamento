@@ -28,7 +28,7 @@ class CarregarConfig:
     
     def __init__(self):
         self.f = None # Inicia o arquivo como none
-        self.configSim = {"algoritmo_escalonamento" : "STFR", #Valores padrão de carregamento
+        self.configSim = {"algoritmo_escalonamento" : "SRTF", #Valores padrão de carregamento
                      "quantum": 2,
                      "qtde_cpus": 4,
                      "alpha": 1
@@ -56,7 +56,7 @@ class CarregarConfig:
                 
                 numero_linha = i + 1
                 conteudo = linhas.split(";")
-                algoritmo = "STFR" if conteudo[0].upper() == "" else conteudo[0].upper()
+                algoritmo = "SRTF" if conteudo[0].upper() == "" else conteudo[0].upper()
 
                 if i == 0:
                     if algoritmo == "PRIOPENV":
@@ -71,7 +71,7 @@ class CarregarConfig:
                             "'ALGORITMO;QUANTUM;CPUS'. Exemplo: SRTF;2;2"
                         )
                     self.configSim.update({
-                        "algoritmo_escalonamento": "STFR" if conteudo[0].upper() == "" else conteudo[0].upper(),
+                        "algoritmo_escalonamento": "SRTF" if conteudo[0].upper() == "" else conteudo[0].upper(),
                         "quantum": 2 if conteudo[1].upper() == "" else int(conteudo[1]),
                         "qtde_cpus": 2 if conteudo[2].upper() == "" else int(conteudo[2]),
                         "alpha": 1 if len(conteudo) == 3 or conteudo[3] == "" else int(conteudo[3])
@@ -144,7 +144,7 @@ class CarregarConfig:
 
         for t in T:
             if t.id == -1: #se o id da tarefa for -1, o id tava vazio, então atribui um id com base no maior id já usado + 1
-                t.id = max(l_id) + 1 if l_id else 1
+                t.id = max(l_id) + 1 if l_id else 0
                 l_id.append(t.id)
             if t.cor == "": # se a cor for vazia, atribui uma cor sugerida dos enum de cres
                 for cor in CORES_SUGESTAO:
@@ -174,7 +174,7 @@ class CarregarConfig:
             if not (valor.startswith("[") and valor.endswith("]")):
                 raise ValueError(
                     f"Erro na linha {numero_linha}: lista de eventos com colchetes inválidos. "
-                    "Use ML01:00,MU01:05 ou [ML01:00,MU01:05]."
+                    "Use ML01:00,MU01:05,IO:02-03 ou [ML01:00,MU01:05,IO:02-03]."
                 )
 
             # Remove colchetes
@@ -190,25 +190,48 @@ class CarregarConfig:
             evento = evento.strip().upper()
 
             # Regex para separar cada elemento das informações do mutex
-            resultado = re.fullmatch(r"(ML|MU)(\d+):(\d+)", evento)
+            resultado_mutex = re.fullmatch(r"(ML|MU)(\d+):(\d+)", evento)
 
-            if resultado is None:
-                raise ValueError(
-                    f"Erro na linha {numero_linha}: evento inválido '{evento}'. "
-                    "Formato esperado: MLxx:tempo ou MUxx:tempo. Exemplo: ML01:00"
-                )
-                
-            tipo = resultado.group(1)
-            mutex_id = int(resultado.group(2))
-            tempo = int(resultado.group(3))
+            if resultado_mutex is not None:
+                tipo = resultado_mutex.group(1)
+                mutex_id = int(resultado_mutex.group(2))
+                tempo = int(resultado_mutex.group(3))
 
-            # Cria evento e adiciona na lista
-            eventos.append(EventoTarefa(
-                tipo = tipo,
-                mutex_id = mutex_id,
-                tempo = tempo,
-                ordem = ordem
-            ))
+                eventos.append(EventoTarefa(
+                    tipo=tipo,
+                    mutex_id=mutex_id,
+                    tempo=tempo,
+                    ordem=ordem
+                ))
+
+                continue
+
+            resultado_io = re.fullmatch(r"IO:(\d+)-(\d+)", evento)
+
+            if resultado_io is not None:
+                tempo = int(resultado_io.group(1))
+                duracao = int(resultado_io.group(2))
+
+                if duracao < 1:
+                    raise ValueError(
+                        f"Erro na linha {numero_linha}: evento IO inválido '{evento}'. "
+                        "A duração mínima de uma operação de E/S é 1."
+                    )
+
+                eventos.append(EventoTarefa(
+                    tipo="IO",
+                    tempo=tempo,
+                    duracao=duracao,
+                    ordem=ordem
+                ))
+
+                continue
+
+            raise ValueError(
+                f"Erro na linha {numero_linha}: evento inválido '{evento}'. "
+                "Formatos esperados: MLxx:tempo, MUxx:tempo ou IO:tempo-duracao. "
+                "Exemplos: ML01:00, MU01:05, IO:02-03"
+            )
 
         return eventos
             

@@ -264,7 +264,7 @@ class InterfaceSimulador:
     def acao_executar_tudo(self):
         suspensas_manuais = [
             t for t in self.engine.estado_atual.fila_suspensas
-            if getattr(t, "motivoBloqueio", "") != "MUTEX"
+            if getattr(t, "motivoBloqueio", "") not in ("MUTEX", "IO")
         ]
 
         if len(suspensas_manuais) > 0:
@@ -645,8 +645,9 @@ class InterfaceSimulador:
 
             for tarefa_suspensa in getattr(foto_execucao, 'fila_suspensas', []):
                 y_pos = mapa_y[tarefa_suspensa.id]
+                motivo = getattr(tarefa_suspensa, "motivoBloqueio", "")
 
-                if getattr(tarefa_suspensa, "motivoBloqueio", "") == "MUTEX":
+                if motivo == "MUTEX":
                     self.ax.barh(
                         y=y_pos,
                         width=1,
@@ -654,6 +655,16 @@ class InterfaceSimulador:
                         color="#6C3483",
                         edgecolor="white",
                         hatch="///",
+                        height=0.6
+                    )
+                elif motivo == "IO":
+                    self.ax.barh(
+                        y=y_pos,
+                        width=1,
+                        left=tick,
+                        color="#1F618D",
+                        edgecolor="white",
+                        hatch="\\\\\\",
                         height=0.6
                     )
                 else:
@@ -685,18 +696,29 @@ class InterfaceSimulador:
             tick_evento = evento_gantt["tick"]
             y_pos = mapa_y[tarefa_id]
             tipo = evento_gantt["tipo"]
-            mutex_id = evento_gantt["mutex_id"]
 
             if tipo == "ML":
                 cor = "#8E44AD" if evento_gantt.get("bloqueou", False) else "#C0392B"
                 marcador = "P"
                 deslocamento_y = 0.42
-                texto = f"{mutex_id}"
-            else:
+
+            elif tipo == "MU":
                 cor = "#27AE60"
                 marcador = "o"
                 deslocamento_y = -0.42
-                texto = f"{mutex_id}"
+
+            elif tipo == "IO":
+                cor = "#1F77B4"
+                marcador = "s"
+                deslocamento_y = 0.42
+
+            elif tipo == "IRQ":
+                cor = "#17A589"
+                marcador = "D"
+                deslocamento_y = -0.42
+
+            else:
+                continue
 
             self.ax.plot(
                 tick_evento,
@@ -706,18 +728,6 @@ class InterfaceSimulador:
                 markersize=8,
                 linestyle="None",
                 zorder=5
-            )
-
-            self.ax.text(
-                tick_evento + 0.08,
-                y_pos + deslocamento_y,
-                texto,
-                fontsize=7,
-                fontweight="bold",
-                color=cor,
-                va="center",
-                zorder=6,
-                bbox=dict(facecolor="white", edgecolor="none", alpha=0.75, pad=1)
             )
 
         self.ax.xaxis.grid(True, linestyle='--', alpha=0.7)
@@ -734,9 +744,12 @@ class InterfaceSimulador:
             Line2D([0], [0], color='#C0392B', marker='P', linestyle='None', markersize=8, label='Lock ML'),
             Line2D([0], [0], color='#8E44AD', marker='P', linestyle='None', markersize=8, label='Lock ML bloqueou'),
             Line2D([0], [0], color='#27AE60', marker='o', linestyle='None', markersize=8, label='Unlock MU'),
+            Line2D([0], [0], color='#1F77B4', marker='s', linestyle='None', markersize=8, label='Entrada/Saída IO'),
+            Line2D([0], [0], color='#17A589', marker='D', linestyle='None', markersize=8, label='IRQ fim E/S'),
             plt.Rectangle((0,0), 1, 1, facecolor="white", edgecolor="black", label='Fila de Prontos'),
-            plt.Rectangle((0,0), 1, 1, facecolor="black", edgecolor="white", label='Suspensa Manual/I/O'),
+            plt.Rectangle((0,0), 1, 1, facecolor="black", edgecolor="white", label='Suspensa Manual'),
             plt.Rectangle((0,0), 1, 1, facecolor="#6C3483", edgecolor="white", hatch="///", label='Suspensa por Mutex'),
+            plt.Rectangle((0,0), 1, 1, facecolor="#1F618D", edgecolor="white", hatch="\\\\\\", label='Suspensa por E/S'),
         ]
         self.ax.legend(handles=legend_elements, loc='upper right', fontsize=7)
 

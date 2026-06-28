@@ -78,7 +78,7 @@ class TestConfigParsing(unittest.TestCase):
         path = _write_temp_config(cfg_text)
         config = SimuladorConfig(path)
 
-        self.assertEqual(config.algoritmoEscalomento, "STFR")
+        self.assertEqual(config.algoritmoEscalomento, "SRTF")
         self.assertEqual(config.quantum, 2)
         self.assertEqual(config.qtde_cpus, 2)
 

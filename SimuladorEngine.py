@@ -35,27 +35,53 @@ class SimuladorEngine:
         self.prepararSimulador() # Prepara o simulador, colocando as tarefas que entram no tempo 0 na fila de prontos e chamando o escalonador para definir quais tarefas vão para cada cpu
     
     # Método que percorre a lista de tarefas futuras e coloca na fila de prontos as que entram agora no sistema
-    def verificar_nascimento(self) -> None: 
+    def verificar_nascimento(self, escalonar: bool = True) -> bool: 
         tarefas_futuras = []
+
         for tarefa_futura in self.estado_atual.tarefas_futuras:
             if tarefa_futura.tempoDeIngresso == self.estado_atual.relogio_global:
                 tarefas_futuras.append(tarefa_futura)
+
+        ingressou_alguma_tarefa = False
+
         for tf in tarefas_futuras:
-            if  not(tf.estado == EstadosTarefa.BLOQUEADO):
+            if not (tf.estado == EstadosTarefa.BLOQUEADO):
                 self.estado_atual.ingressar_tarefa(tf)
+                ingressou_alguma_tarefa = True
             else:
                 self.estado_atual.tarefas_futuras.remove(tf)
                 continue
-        if len(tarefas_futuras) > 0:
+
+        if ingressou_alguma_tarefa and escalonar:
             self.escalonar_novas_tarefas()
-        
+
+        return ingressou_alguma_tarefa
+    
+    def validar_mutexes_antes_finalizar(self, tarefa: TCB) -> None:
+        mutexes_possuidos = []
+
+        for mutex in self.estado_atual.mutexes.values():
+            if mutex.dono == tarefa:
+                mutexes_possuidos.append(mutex.id)
+
+        if len(mutexes_possuidos) > 0:
+            ids_mutex = ", ".join([str(id_mutex) for id_mutex in mutexes_possuidos])
+
+            raise ValueError(
+                f"Tarefa T{tarefa.id} finalizou enquanto ainda era dona do(s) mutex(es): {ids_mutex}. "
+                "Adicione o evento MU correspondente antes do término da tarefa."
+            )
+
+    def finalizar_tarefa_segura(self, tarefa: TCB, cpu: CPU) -> None:
+        self.validar_mutexes_antes_finalizar(tarefa)
+        self.estado_atual.finalizar_tarefa(tarefa, cpu)
 
     # Método que verifica todas as tarefas da cpu, diminui o tempo delas e verifica se elas finalizaram
     def processar_cpus(self) -> None:
         for p in self.estado_atual.cpus:
             if p.atualTarefa is not None: 
                 if p.atualTarefa.tempoCorrido <= 0: #o usuario pode ter editado a tarefa para ela terminal antes do tempo, nesse caso a tarefa deve ser finalizada imediatamente
-                    self.estado_atual.finalizar_tarefa(p.atualTarefa, p)
+                    self.finalizar_tarefa_segura(p.atualTarefa, p)
                     self.escalonar_cpu(p)
             if p.atualTarefa is not None:
                 bloqueou = self.processar_eventos_tarefa(p, p.atualTarefa)
@@ -68,12 +94,12 @@ class SimuladorEngine:
 
                 p.atualTarefa.quatum_dado = p.atualTarefa.quatum_dado + 1
                 if p.atualTarefa.tempoCorrido <= 0:
-                    self.estado_atual.finalizar_tarefa(p.atualTarefa, p)
+                    self.finalizar_tarefa_segura(p.atualTarefa, p)
                     self.escalonar_cpu(p)
                 else:
                     p.atualTarefa.tempoCorrido = p.atualTarefa.tempoCorrido - 1
                     if p.atualTarefa.tempoCorrido == 0:
-                        self.estado_atual.finalizar_tarefa(p.atualTarefa, p)
+                        self.finalizar_tarefa_segura(p.atualTarefa, p)
                         self.escalonar_cpu(p)
                     elif p.atualTarefa.quatum_dado == self.quantumTotal:
                         self.escalonar_cpu(p)
@@ -206,9 +232,11 @@ class SimuladorEngine:
         self.processarTempoCPU()
         self.processar_cpus()
         self.estado_atual.relogio_global = self.estado_atual.relogio_global + 1
+        acordou_por_io = self.processar_irqs_io()
         # Aplica ingressos do novo tick (tarefa com tempoDeIngresso == relogio_global)
-        self.verificar_nascimento()
-        #self.mostrarListaDeBloqueio()
+        ingressou_tarefa = self.verificar_nascimento(escalonar=False)
+        if acordou_por_io or ingressou_tarefa:
+            self.escalonar_novas_tarefas()
         self.historico_estados.append(self.estado_atual.clonar_estado())
 
     # Método que controla o fluxo de retroceder o tempo do sistema
@@ -298,6 +326,8 @@ class SimuladorEngine:
                 bloqueou = self.executar_lock_mutex(cpu, tarefa, evento)
 
                 if bloqueou:
+                    if precisa_reescalonar_global:
+                        self.escalonar_novas_tarefas()
                     return True
 
             elif evento.tipo == "MU":
@@ -305,6 +335,14 @@ class SimuladorEngine:
 
                 if acordou_tarefa:
                     precisa_reescalonar_global = True
+
+            elif evento.tipo == "IO":
+                bloqueou = self.executar_io(cpu, tarefa, evento)
+
+                if bloqueou:
+                    if precisa_reescalonar_global:
+                        self.escalonar_novas_tarefas()
+                    return True
 
         if precisa_reescalonar_global:
             self.escalonar_novas_tarefas()
@@ -390,3 +428,66 @@ class SimuladorEngine:
             "bloqueou": bloqueou,
             "acordou": acordou,
         })
+
+    def registrar_evento_io(self, tarefa: TCB, evento) -> None:
+        if not hasattr(self.estado_atual, "eventos_gantt"):
+            self.estado_atual.eventos_gantt = []
+
+        self.estado_atual.eventos_gantt.append({
+            "tick": self.estado_atual.relogio_global,
+            "tarefa_id": tarefa.id,
+            "tipo": "IO",
+            "duracao": evento.duracao,
+        })
+
+    def registrar_evento_irq(self, tarefa: TCB) -> None:
+        if not hasattr(self.estado_atual, "eventos_gantt"):
+            self.estado_atual.eventos_gantt = []
+
+        self.estado_atual.eventos_gantt.append({
+            "tick": self.estado_atual.relogio_global,
+            "tarefa_id": tarefa.id,
+            "tipo": "IRQ",
+        })
+
+    def executar_io(self, cpu: CPU, tarefa: TCB, evento) -> bool:
+        tarefa.eventosExecutados.add(evento.ordem)
+
+        if evento.duracao is None or evento.duracao < 1:
+            raise ValueError(
+                f"Tarefa T{tarefa.id} possui evento de E/S inválido. "
+                "A duração da operação de E/S deve ser maior ou igual a 1."
+            )
+
+        tarefa.motivoBloqueio = "IO"
+        tarefa.mutexBloqueado = None
+        tarefa.ioTempoTermina = self.estado_atual.relogio_global + evento.duracao
+
+        self.registrar_evento_io(tarefa, evento)
+
+        self.estado_atual.suspender_tarefa(tarefa)
+
+        self.escalonar_cpu(cpu)
+
+        return True
+    
+    def processar_irqs_io(self) -> bool:
+        acordou_alguma_tarefa = False
+
+        for tarefa in list(self.estado_atual.fila_suspensas):
+            if tarefa.motivoBloqueio != "IO":
+                continue
+
+            if tarefa.ioTempoTermina is None:
+                continue
+
+            if self.estado_atual.relogio_global >= tarefa.ioTempoTermina:
+                tarefa.motivoBloqueio = ""
+                tarefa.ioTempoTermina = None
+
+                self.estado_atual.acordar_tarefa(tarefa)
+                self.registrar_evento_irq(tarefa)
+
+                acordou_alguma_tarefa = True
+
+        return acordou_alguma_tarefa
