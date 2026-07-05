@@ -616,6 +616,21 @@ class InterfaceSimulador:
         # marca o termino de uma tarefa: primeiro tick em que a tarefa é finalizada
         tarefas_concluidas = set()
 
+        eventos_gantt = getattr(estado_atual, "eventos_gantt", [])
+
+        intervalos_io = {}
+
+        for evento_gantt in eventos_gantt:
+            if evento_gantt["tipo"] != "IO":
+                continue
+
+            tarefa_id = evento_gantt["tarefa_id"]
+            tick_inicio = evento_gantt["tick"]
+            duracao = evento_gantt.get("duracao", 0)
+
+            for tick_io in range(tick_inicio, tick_inicio + duracao):
+                intervalos_io[(tarefa_id, tick_io)] = True
+
         # desenha por intervalos executados: o estado do tick T representa o que rodará durante [T, T+1)
         # começa em um o loop a partit do tick 1, para comparar como tick anterior e mostrar a execução do tick 0.
         # isso faz que a gente consiga mostrar a inicialização sem avançar um tick das tarefas já carregadas
@@ -627,6 +642,9 @@ class InterfaceSimulador:
             for cpu in foto_execucao.cpus:
                 tarefa = cpu.atualTarefa
                 if tarefa is not None:
+                    if (tarefa.id, tick) in intervalos_io:
+                        continue
+
                     y_pos = mapa_y[tarefa.id]
                     cor_hex = f"#{tarefa.cor}" if not tarefa.cor.startswith('#') else tarefa.cor
                     self.ax.barh(y=y_pos, width=1, left=tick, color=cor_hex, edgecolor='black', height=0.6)
@@ -685,7 +703,29 @@ class InterfaceSimulador:
                     self.ax.plot(tick, y_pos - 0.35, marker='X', color='#E74C3C', markersize=8)
                     tarefas_concluidas.add(tf.id)
 
-        eventos_gantt = getattr(estado_atual, "eventos_gantt", [])
+        for evento_gantt in eventos_gantt:
+            if evento_gantt["tipo"] != "IO":
+                continue
+
+            tarefa_id = evento_gantt["tarefa_id"]
+
+            if tarefa_id not in mapa_y:
+                continue
+
+            tick_inicio = evento_gantt["tick"]
+            duracao = evento_gantt.get("duracao", 0)
+            y_pos = mapa_y[tarefa_id]
+
+            self.ax.barh(
+                y=y_pos,
+                width=duracao,
+                left=tick_inicio,
+                color="#1F618D",
+                edgecolor="white",
+                hatch="\\\\\\",
+                height=0.6,
+                zorder=4
+            )
 
         for evento_gantt in eventos_gantt:
             tarefa_id = evento_gantt["tarefa_id"]
