@@ -77,12 +77,14 @@ class CarregarConfig:
                         "alpha": 1 if len(conteudo) == 3 or conteudo[3] == "" else int(conteudo[3])
                     })
                 else:
-                    if len(conteudo) != 6:
+                    if len(conteudo) < 5:
                         raise ValueError(
                             f"Erro na linha {numero_linha}: cada tarefa deve ter 6 campos separados por ponto e vírgula.\n"
                             "Formato esperado: id;cor;tempoDeIngresso;tempoTotal;prioridade;listaEventos\n"
                             "Exemplo: 1;FF6B6B;0;10;3;[]"
                         )
+                    
+                    texto_eventos = ";".join(conteudo[5:]) if len(conteudo) > 5 else ""
 
                     tarefa = TCB(
                         id = self.parsetarefaId(conteudo[0]), # trata as ids em especial, se a entrada for um número direto ou uma
@@ -91,7 +93,7 @@ class CarregarConfig:
                         tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
                         tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
                         prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
-                        listaEvento = self.parseListaEventos(conteudo[5], numero_linha)             
+                        listaEvento = self.parseListaEventos(texto_eventos, numero_linha)             
                     )
 
                     self.listTarefas.append(tarefa)
@@ -163,39 +165,42 @@ class CarregarConfig:
 
     # Método para pegar o valor passado no txt e transformar e uma litsa de EventoTarefa
     def parseListaEventos(self, valor: str, numero_linha: int) -> list[EventoTarefa]:
-        valor = valor.strip()
+        valor = valor.strip().upper()
 
-        # Verifca se o valor está vazio ou não tem nada na lista
         if valor == "" or valor == "[]":
-            return[]
-            
-        # Verifica se os colchetes estão corretos
+            return []
+
         if valor.startswith("[") or valor.endswith("]"):
             if not (valor.startswith("[") and valor.endswith("]")):
                 raise ValueError(
                     f"Erro na linha {numero_linha}: lista de eventos com colchetes inválidos. "
-                    "Use ML01:00,MU01:05,IO:02-03 ou [ML01:00,MU01:05,IO:02-03]."
+                    "Use ML01:00;MU01:05;IO:02-03 ou [ML01:00,MU01:05,IO:02-03]."
                 )
 
-            # Remove colchetes
             valor = valor[1:-1].strip()
 
         if valor == "":
             return []
-            
+
         eventos: list[EventoTarefa] = []
 
-        # Percorre cada um dos elementos da lista de eventos 
-        for ordem, evento in enumerate(valor.split(",")):
-            evento = evento.strip().upper()
+        padrao_evento = re.compile(r"(ML|MU)(\d+):(\d+)|IO:(\d+)-(\d+)")
 
-            # Regex para separar cada elemento das informações do mutex
-            resultado_mutex = re.fullmatch(r"(ML|MU)(\d+):(\d+)", evento)
+        posicao_atual = 0
 
-            if resultado_mutex is not None:
-                tipo = resultado_mutex.group(1)
-                mutex_id = int(resultado_mutex.group(2))
-                tempo = int(resultado_mutex.group(3))
+        for ordem, resultado in enumerate(padrao_evento.finditer(valor)):
+            texto_entre_eventos = valor[posicao_atual:resultado.start()]
+
+            if re.fullmatch(r"[\s,;]*", texto_entre_eventos) is None:
+                raise ValueError(
+                    f"Erro na linha {numero_linha}: trecho inválido na lista de eventos: '{texto_entre_eventos}'. "
+                    "Formatos esperados: MLxx:tempo, MUxx:tempo ou IO:tempo-duracao."
+                )
+
+            if resultado.group(1) is not None:
+                tipo = resultado.group(1)
+                mutex_id = int(resultado.group(2))
+                tempo = int(resultado.group(3))
 
                 eventos.append(EventoTarefa(
                     tipo=tipo,
@@ -203,18 +208,13 @@ class CarregarConfig:
                     tempo=tempo,
                     ordem=ordem
                 ))
-
-                continue
-
-            resultado_io = re.fullmatch(r"IO:(\d+)-(\d+)", evento)
-
-            if resultado_io is not None:
-                tempo = int(resultado_io.group(1))
-                duracao = int(resultado_io.group(2))
+            else:
+                tempo = int(resultado.group(4))
+                duracao = int(resultado.group(5))
 
                 if duracao < 1:
                     raise ValueError(
-                        f"Erro na linha {numero_linha}: evento IO inválido '{evento}'. "
+                        f"Erro na linha {numero_linha}: evento IO inválido 'IO:{tempo:02d}-{duracao:02d}'. "
                         "A duração mínima de uma operação de E/S é 1."
                     )
 
@@ -225,12 +225,14 @@ class CarregarConfig:
                     ordem=ordem
                 ))
 
-                continue
+            posicao_atual = resultado.end()
 
+        texto_final = valor[posicao_atual:]
+
+        if re.fullmatch(r"[\s,;]*", texto_final) is None:
             raise ValueError(
-                f"Erro na linha {numero_linha}: evento inválido '{evento}'. "
-                "Formatos esperados: MLxx:tempo, MUxx:tempo ou IO:tempo-duracao. "
-                "Exemplos: ML01:00, MU01:05, IO:02-03"
+                f"Erro na linha {numero_linha}: trecho inválido no final da lista de eventos: '{texto_final}'. "
+                "Formatos esperados: MLxx:tempo, MUxx:tempo ou IO:tempo-duracao."
             )
 
         return eventos

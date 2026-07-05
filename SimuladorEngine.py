@@ -98,9 +98,22 @@ class SimuladorEngine:
                     self.escalonar_cpu(p)
                 else:
                     p.atualTarefa.tempoCorrido = p.atualTarefa.tempoCorrido - 1
+
                     if p.atualTarefa.tempoCorrido == 0:
-                        self.finalizar_tarefa_segura(p.atualTarefa, p)
+                        tarefa_finalizando = p.atualTarefa
+
+                        bloqueou_no_final = self.processar_eventos_tarefa(
+                            p,
+                            tarefa_finalizando,
+                            reescalonar_ao_acordar=False
+                        )
+
+                        if bloqueou_no_final:
+                            continue
+
+                        self.finalizar_tarefa_segura(tarefa_finalizando, p)
                         self.escalonar_cpu(p)
+
                     elif p.atualTarefa.quatum_dado == self.quantumTotal:
                         self.escalonar_cpu(p)
             else:
@@ -308,7 +321,7 @@ class SimuladorEngine:
     def tempo_executado_tarefa(self, tarefa: TCB) -> int:
         return tarefa.tempoTotal - tarefa.tempoCorrido
     
-    def processar_eventos_tarefa(self, cpu: CPU, tarefa: TCB) -> bool:
+    def processar_eventos_tarefa(self, cpu: CPU, tarefa: TCB, reescalonar_ao_acordar: bool = True) -> bool:
         tempo_executado = self.tempo_executado_tarefa(tarefa)
 
         eventos_do_tick = []
@@ -326,7 +339,7 @@ class SimuladorEngine:
                 bloqueou = self.executar_lock_mutex(cpu, tarefa, evento)
 
                 if bloqueou:
-                    if precisa_reescalonar_global:
+                    if precisa_reescalonar_global and reescalonar_ao_acordar:
                         self.escalonar_novas_tarefas()
                     return True
 
@@ -340,11 +353,11 @@ class SimuladorEngine:
                 bloqueou = self.executar_io(cpu, tarefa, evento)
 
                 if bloqueou:
-                    if precisa_reescalonar_global:
+                    if precisa_reescalonar_global and reescalonar_ao_acordar:
                         self.escalonar_novas_tarefas()
                     return True
 
-        if precisa_reescalonar_global:
+        if precisa_reescalonar_global and reescalonar_ao_acordar:
             self.escalonar_novas_tarefas()
 
         return False
