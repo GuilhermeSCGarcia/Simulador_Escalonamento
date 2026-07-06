@@ -414,7 +414,12 @@ class SimuladorEngine:
         proxima_tarefa.mutexBloqueado = None
 
         self.estado_atual.acordar_tarefa(proxima_tarefa)
-        self.registrar_evento_mutex(tarefa, evento, acordou=True)
+        self.registrar_evento_mutex(
+            tarefa,
+            evento,
+            acordou=True,
+            tarefa_acordada_id=proxima_tarefa.id
+        )
 
         return True
 
@@ -429,18 +434,23 @@ class SimuladorEngine:
             if cpu.atualTarefa == tarefa:
                 self.processar_eventos_tarefa(cpu, tarefa)
 
-    def registrar_evento_mutex(self, tarefa: TCB, evento, bloqueou=False, acordou=False) -> None:
+    def registrar_evento_mutex(self, tarefa: TCB, evento, bloqueou=False, acordou=False, tarefa_acordada_id=None) -> None:
         if not hasattr(self.estado_atual, "eventos_gantt"):
             self.estado_atual.eventos_gantt = []
 
-        self.estado_atual.eventos_gantt.append({
+        evento_gantt = {
             "tick": self.estado_atual.relogio_global,
             "tarefa_id": tarefa.id,
             "tipo": evento.tipo,
             "mutex_id": evento.mutex_id,
             "bloqueou": bloqueou,
             "acordou": acordou,
-        })
+        }
+
+        if tarefa_acordada_id is not None:
+            evento_gantt["tarefa_acordada_id"] = tarefa_acordada_id
+
+        self.estado_atual.eventos_gantt.append(evento_gantt)
 
     def registrar_evento_io(self, tarefa: TCB, evento) -> None:
         if not hasattr(self.estado_atual, "eventos_gantt"):

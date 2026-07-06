@@ -619,6 +619,9 @@ class InterfaceSimulador:
         eventos_gantt = getattr(estado_atual, "eventos_gantt", [])
 
         intervalos_io = {}
+        intervalos_mutex = {}
+        bloqueios_mutex_abertos = {}
+        desbloqueios_mutex_por_tick = {}
 
         for evento_gantt in eventos_gantt:
             if evento_gantt["tipo"] != "IO":
@@ -631,6 +634,27 @@ class InterfaceSimulador:
             for tick_io in range(tick_inicio, tick_inicio + duracao):
                 intervalos_io[(tarefa_id, tick_io)] = True
 
+        for evento_gantt in eventos_gantt:
+            tipo = evento_gantt["tipo"]
+
+            if tipo == "ML" and evento_gantt.get("bloqueou", False):
+                tarefa_id = evento_gantt["tarefa_id"]
+                bloqueios_mutex_abertos[tarefa_id] = evento_gantt["tick"]
+
+            elif tipo == "MU" and evento_gantt.get("tarefa_acordada_id") is not None:
+                tarefa_id = evento_gantt["tarefa_acordada_id"]
+                tick_fim = evento_gantt["tick"]
+                tick_inicio = bloqueios_mutex_abertos.pop(tarefa_id, None)
+                desbloqueios_mutex_por_tick.setdefault(tick_fim, []).append(tarefa_id)
+
+                if tick_inicio is not None:
+                    for tick_mutex in range(tick_inicio, tick_fim):
+                        intervalos_mutex[(tarefa_id, tick_mutex)] = True
+
+        for tarefa_id, tick_inicio in bloqueios_mutex_abertos.items():
+            for tick_mutex in range(tick_inicio, estado_atual.relogio_global):
+                intervalos_mutex[(tarefa_id, tick_mutex)] = True
+
         # desenha por intervalos executados: o estado do tick T representa o que rodará durante [T, T+1)
         # começa em um o loop a partit do tick 1, para comparar como tick anterior e mostrar a execução do tick 0.
         # isso faz que a gente consiga mostrar a inicialização sem avançar um tick das tarefas já carregadas
@@ -639,10 +663,20 @@ class InterfaceSimulador:
             foto_execucao = todas_fotos_do_tempo[i - 1] 
             tick = foto_execucao.relogio_global
 
+            for tarefa_id in desbloqueios_mutex_por_tick.get(tick, []):
+                if tarefa_id not in mapa_y:
+                    continue
+
+                if (tarefa_id, tick) in intervalos_io or (tarefa_id, tick) in intervalos_mutex:
+                    continue
+
+                y_pos = mapa_y[tarefa_id]
+                self.ax.barh(y=y_pos, width=1, left=tick, color='white', edgecolor='black', height=0.6, zorder=0)
+
             for cpu in foto_execucao.cpus:
                 tarefa = cpu.atualTarefa
                 if tarefa is not None:
-                    if (tarefa.id, tick) in intervalos_io:
+                    if (tarefa.id, tick) in intervalos_io or (tarefa.id, tick) in intervalos_mutex:
                         continue
 
                     y_pos = mapa_y[tarefa.id]
@@ -666,6 +700,8 @@ class InterfaceSimulador:
                 motivo = getattr(tarefa_suspensa, "motivoBloqueio", "")
 
                 if motivo == "MUTEX":
+                    if (tarefa_suspensa.id, tick) not in intervalos_mutex:
+                        continue
                     self.ax.barh(
                         y=y_pos,
                         width=1,
