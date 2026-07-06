@@ -12,7 +12,7 @@ from tkinter import ttk, filedialog, messagebox
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.lines import Line2D 
 
 from SimuladorConfig import SimuladorConfig
@@ -28,6 +28,7 @@ class InterfaceSimulador:
         self.root.title("Simulador de Escalonamento de SO")
         self.root.geometry("1600x900")
         self.root.configure(bg="#ECF0F1") # Cor de fundo principal
+        self.root.protocol("WM_DELETE_WINDOW", self.ao_fechar_janela)
 
         # Estilo moderno para a Tabela 
         self.style = ttk.Style()
@@ -126,7 +127,9 @@ class InterfaceSimulador:
         self.ax.set_facecolor('#FFFFFF') 
         
         # Integração: Converte o plot do Matplotlib em um widget utilizável pelo Tkinter
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_grafico) 
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_grafico)
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_grafico)
+        self.toolbar.update() 
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
 
         # Sub-Painel Inferior: Tabela de Tarefas/CPUs 
@@ -207,7 +210,7 @@ class InterfaceSimulador:
             
             # limpar figura anterior quando carregar um novo arquivo, para evitar que a simulação anterior atrapalhe a nova
             if self.fig:
-                plt.close(self.fig)
+                self.ax.clear()
             
             
             estado_inicial = SimuladorEstado(config.listaCPU, config.listaTarefasCarregadas, config.quantum) #prepra o estado inicial
@@ -215,6 +218,9 @@ class InterfaceSimulador:
             # Atualiza as informações do painel lateral com os dados do arquivos carregado
             self.lbl_info.config(text=f"Algoritmo: {config.algoritmoEscalomento}\nCPUs: {config.qtde_cpus}\nTarefas carregadas: {len(config.listaTarefasCarregadas)}\nQuantum total: {config.quantum}")
             
+            if self.engine.config.algoritmoEscalomento == "PRIOPENV":
+                self.lbl_info.config(text = self.lbl_info.cget("text") + "\nAlfa: " + str(self.engine.config.alpha))
+
             # Destrava e seta o algoritmo atual ---
             self.combo_algoritmo.config(state="readonly")
             self.combo_algoritmo.set(config.algoritmoEscalomento.upper())
@@ -299,7 +305,7 @@ class InterfaceSimulador:
             
             #limpar figura anterior quando carregar um novo arquivo, para evitar que a simulação anterior atrapalhe a nova
             if self.fig:
-                plt.close(self.fig)
+                self.ax.clear()
             
             
             estado_inicial = SimuladorEstado(config.listaCPU, config.listaTarefasCarregadas, config.quantum) #prepra o estado inicial
@@ -851,5 +857,17 @@ class InterfaceSimulador:
             plt.Rectangle((0,0), 1, 1, facecolor="#1F618D", edgecolor="white", hatch="\\\\\\", label='Suspensa por E/S'),
         ]
         self.ax.legend(handles=legend_elements, loc='upper right', fontsize=7)
-
+        self.toolbar.update()
         self.canvas.draw()
+
+    #Método que garante ao programa encerrar correntamente quando a janela for fechada
+    def ao_fechar_janela(self):
+        import sys
+        # Fecha todas as figuras abertas do matplotlib para liberar memória
+        plt.close('all') 
+        # Para o loop principal do Tkinter
+        self.root.quit() 
+        # Destrói a janela de vez
+        self.root.destroy() 
+        # Garante o encerramento do processo Python no console
+        sys.exit(0)
