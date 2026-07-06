@@ -521,8 +521,6 @@ class InterfaceSimulador:
         self.ax.set_title(f"Execução - {self.engine.config.algoritmoEscalomento}", fontsize=14, fontweight="bold", color="#2C3E50") # atualiza o título do gráfico para refletir o algoritmo atual
         # Declara a variável estado puxando da engine
         estado = self.engine.estado_atual
-        
-        estado_quantum = self.engine.historico_estados[-2] if len(self.engine.historico_estados) > 1 else self.engine.estado_atual
 
         
         #Atualiza os textos dos labels
@@ -563,7 +561,7 @@ class InterfaceSimulador:
             for cpu in estado.cpus:
                 status_energia = cpu.estado.name if hasattr(cpu.estado, 'name') else str(cpu.estado)
                 tarefa_str = f"T{cpu.atualTarefa.id}" if cpu.atualTarefa else "Nenhuma"
-                cpu_quantum = estado_quantum.cpus[cpu.id].atualTarefa.quatum_dado if estado_quantum.cpus[cpu.id].atualTarefa else 0
+                cpu_quantum = cpu.atualTarefa.quatum_dado if cpu.atualTarefa else 0
                 quantum_str = f"{cpu_quantum+1}/{self.engine.quantumTotal}" if cpu.atualTarefa else "-"
                 
                 # Cálculo da % de uso da CPU (evitando divisão por zero)
