@@ -113,10 +113,10 @@ class SimuladorEngine:
                             continue
 
                         self.finalizar_tarefa_segura(tarefa_finalizando, p)
-                        self.escalonar_cpu(p)
+                        self.escalonar_cpu(p, processar_eventos_ao_entrar=False)
 
                     elif p.atualTarefa.quatum_dado == self.quantumTotal:
-                        self.escalonar_cpu(p)
+                        self.escalonar_cpu(p, processar_eventos_ao_entrar=False)
             else:
                 if(len(self.estado_atual.fila_prontos) > 0 ):
                     self.escalonar_cpu(p)
@@ -127,7 +127,7 @@ class SimuladorEngine:
     #Esse método é para escalonar as tarefas na cpu em específico
     #pois quando uma tarefa atinge o quantum ou finaliza, só aquela cpu precisa ser escalonada
     #e nenhuma outra cpu precisa ser escalonada, para evitar trocas de contexto desnecessárias
-    def escalonar_cpu(self,p: CPU) -> None: # Método para definir quais tarefas vão rodar em cada cpu
+    def escalonar_cpu(self,p: CPU, processar_eventos_ao_entrar: bool = True) -> None: # Método para definir quais tarefas vão rodar em cada cpu
         candidatos = copy.copy(self.estado_atual.fila_prontos) # copia a fila de prontos para a lista de candidados, para não modificar a original
         if p.atualTarefa is not None: #se aquela cpu já tem uma tarefa, ela também é candidata
             candidatos.append(p.atualTarefa)
@@ -150,7 +150,8 @@ class SimuladorEngine:
         if t_escolhida == p.atualTarefa:
             t_escolhida.quatum_dado = 0
             t_escolhida.tempoEspera = 0
-            self.processar_eventos_tarefa(p, t_escolhida)
+            if processar_eventos_ao_entrar:
+                self.processar_eventos_tarefa(p, t_escolhida)
             return
 
         # Se havia tarefa executando e ela perdeu a CPU, volta para prontos
@@ -170,7 +171,8 @@ class SimuladorEngine:
         p.atualTarefa.tempoEspera = 0 #reseta o tempo de espera se a tarefa escolhida entrar na cpu
         p.atualTarefa.estado = EstadosTarefa.EXECUTANDO #atualiza o estado da tarefa escolhida para executando
         p.atualTarefa.idCpu = p.id #atualiza a cpu associada a tarefa escolhida para a cpu atual
-        self.processar_eventos_tarefa(p, p.atualTarefa)
+        if processar_eventos_ao_entrar:
+            self.processar_eventos_tarefa(p, p.atualTarefa)
 
         
     #Esse método é um versão do escalonador para novas tarefas, pois quando cada tarefa nova chega nas CPU's, elas tem que ser comparadas com as tarefas
