@@ -605,6 +605,7 @@ class InterfaceSimulador:
         nomes_tarefas = [f"Tarefa {t.id}" for t in tarefas_ordenadas] #cria uma lista de nomes mostrar no eixo y, com o formato de Tarefa id da tarefa
         posicoes_y = list(range(len(tarefas_ordenadas))) #Lista de posições y para cada tarefa, de acordo com o tamanho
         mapa_y = {t.id: y for t, y in zip(tarefas_ordenadas, posicoes_y)} #Mapeia cada id para sua posição y correspondente, em uma tupla, para facilitar a exibição
+        mapa_tarefas_por_id = {t.id: t for t in tarefas_ordenadas}
 
         self.ax.set_yticks(posicoes_y) #configura a quantidade de ticks no eixo y de acordo com a quantidade de tarefas
         self.ax.set_yticklabels(nomes_tarefas, fontweight="bold", color="#34495E") #cor e estilo
@@ -673,24 +674,6 @@ class InterfaceSimulador:
                 y_pos = mapa_y[tarefa_id]
                 self.ax.barh(y=y_pos, width=1, left=tick, color='white', edgecolor='black', height=0.6, zorder=0)
 
-            for cpu in foto_execucao.cpus:
-                tarefa = cpu.atualTarefa
-                if tarefa is not None:
-                    if (tarefa.id, tick) in intervalos_io or (tarefa.id, tick) in intervalos_mutex:
-                        continue
-
-                    y_pos = mapa_y[tarefa.id]
-                    cor_hex = f"#{tarefa.cor}" if not tarefa.cor.startswith('#') else tarefa.cor
-                    self.ax.barh(y=y_pos, width=1, left=tick, color=cor_hex, edgecolor='black', height=0.6)
-                    self.ax.text(tick + 0.5, y_pos, f"CPU {cpu.id}", ha='center', va='center', color='black', fontweight='bold', fontsize=9)
-
-                    # Marcador de início: só quando a tarefa realmente começou a executar
-                    if tarefa.id not in tarefas_iniciadas:
-                        self.ax.plot(tick, y_pos + 0.35, marker='v', color='#2980B9', markersize=8)
-                        if tarefa.sofreu_sorteio == True:
-                            self.ax.plot(tick, y_pos - 0.35, marker='*', color="#F39C12", markersize=8) # Tarefa que sofreu sorteio tem marcador laranja
-                        tarefas_iniciadas.add(tarefa.id)
-
             for tarefa_pronta in foto_execucao.fila_prontos:
                 y_pos = mapa_y[tarefa_pronta.id]
                 self.ax.barh(y=y_pos, width=1, left=tick, color='white', edgecolor='black', height=0.6)
@@ -730,6 +713,48 @@ class InterfaceSimulador:
                         edgecolor="white",
                         height=0.6
                     )
+
+        execucoes_gantt = getattr(estado_atual, "execucoes_gantt", [])
+
+        for execucao_gantt in execucoes_gantt:
+            tarefa_id = execucao_gantt["tarefa_id"]
+
+            if tarefa_id not in mapa_y or tarefa_id not in mapa_tarefas_por_id:
+                continue
+
+            tick = execucao_gantt["tick"]
+            cpu_id = execucao_gantt["cpu_id"]
+            tarefa = mapa_tarefas_por_id[tarefa_id]
+            y_pos = mapa_y[tarefa_id]
+            cor_hex = f"#{tarefa.cor}" if not tarefa.cor.startswith('#') else tarefa.cor
+
+            self.ax.barh(
+                y=y_pos,
+                width=1,
+                left=tick,
+                color=cor_hex,
+                edgecolor='black',
+                height=0.6,
+                zorder=3
+            )
+            self.ax.text(
+                tick + 0.5,
+                y_pos,
+                f"CPU {cpu_id}",
+                ha='center',
+                va='center',
+                color='black',
+                fontweight='bold',
+                fontsize=9,
+                zorder=4
+            )
+
+            if tarefa_id not in tarefas_iniciadas:
+                self.ax.plot(tick, y_pos + 0.35, marker='v', color='#2980B9', markersize=8, zorder=5)
+                tarefas_iniciadas.add(tarefa_id)
+
+            if execucao_gantt.get("sofreu_sorteio", False):
+                self.ax.plot(tick, y_pos - 0.35, marker='*', color="#F39C12", markersize=8, zorder=5)
 
         for foto_estado in todas_fotos_do_tempo:
             tick = foto_estado.relogio_global

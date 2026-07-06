@@ -28,6 +28,7 @@ class SimuladorEstado:
     tarefas_finalizadas: list[TCB] # Lista de tarefas finalizadas
     mutexes: dict[int, Mutex] # Dicionário de mutex do estado atual
     eventos_gantt: list
+    execucoes_gantt: list
 
     def __init__(self, lista_cpus: list[CPU], lista_tarefas_carregadas: list[TCB],quantumTotal: int):
         self.relogio_global = 0 # Inicia relógio do sistema em zero
@@ -40,6 +41,7 @@ class SimuladorEstado:
         self.quantumTotal = quantumTotal #recebe o quantum total do sistema, criado pelo SimuladorConfig
         self.mutexes = self.criar_mutexes(lista_tarefas_carregadas) # Cria dicionario de mutexes 
         self.eventos_gantt = []
+        self.execucoes_gantt = []
 
     def simulacao_finalizada(self) -> bool: # Método que retorna se a simulacao está finalizada
         if self.tarefas_futuras: # Verifiica se ainda existem tarefas futuras

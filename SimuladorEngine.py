@@ -97,6 +97,7 @@ class SimuladorEngine:
                     self.finalizar_tarefa_segura(p.atualTarefa, p)
                     self.escalonar_cpu(p)
                 else:
+                    self.registrar_execucao_cpu(p, p.atualTarefa)
                     p.atualTarefa.tempoCorrido = p.atualTarefa.tempoCorrido - 1
 
                     if p.atualTarefa.tempoCorrido == 0:
@@ -361,6 +362,17 @@ class SimuladorEngine:
             self.escalonar_novas_tarefas()
 
         return False
+
+    def registrar_execucao_cpu(self, cpu: CPU, tarefa: TCB) -> None:
+        if not hasattr(self.estado_atual, "execucoes_gantt"):
+            self.estado_atual.execucoes_gantt = []
+
+        self.estado_atual.execucoes_gantt.append({
+            "tick": self.estado_atual.relogio_global,
+            "cpu_id": cpu.id,
+            "tarefa_id": tarefa.id,
+            "sofreu_sorteio": tarefa.sofreu_sorteio,
+        })
     
     def executar_lock_mutex(self, cpu: CPU, tarefa: TCB, evento) -> bool:
         mutex = self.estado_atual.mutexes[evento.mutex_id]
