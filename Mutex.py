@@ -14,5 +14,5 @@ from TCB import TCB
 @dataclass
 class Mutex:
     id: int # número do mutex, exemplo ML01 usa mutex id 1
-    dono: TCB | None = None # tarefa que atualmente possui o mutex
+    tarefaDona: TCB | None = None # tarefa que atualmente possui o mutex
     fila_espera: list[TCB] = field(default_factory=list) # tarefas bloqueadas esperando esse mutex, em ordem FIFO

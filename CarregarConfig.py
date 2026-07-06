@@ -93,7 +93,7 @@ class CarregarConfig:
                         tempoTotal = -1 if conteudo[3] == "" else int(conteudo[3]),           
                         tempoCorrido = -1 if conteudo[3] == "" else int(conteudo[3]),       
                         prioridadeEstatica = -1 if conteudo[4] == "" else int(conteudo[4]),    
-                        listaEvento = self.parseListaEventos(texto_eventos, numero_linha)             
+                        listaEvento = self.parseEventos(texto_eventos, numero_linha)             
                     )
 
                     self.listTarefas.append(tarefa)
@@ -164,7 +164,7 @@ class CarregarConfig:
         
 
     # Método para pegar o valor passado no txt e transformar e uma litsa de EventoTarefa
-    def parseListaEventos(self, valor: str, numero_linha: int) -> list[EventoTarefa]:
+    def parseEventos(self, valor: str, numero_linha: int) -> list[EventoTarefa]:
         valor = valor.strip().upper()
 
         if valor == "" or valor == "[]":

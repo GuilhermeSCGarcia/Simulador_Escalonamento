@@ -61,7 +61,7 @@ class SimuladorEngine:
         mutexes_possuidos = []
 
         for mutex in self.estado_atual.mutexes.values():
-            if mutex.dono == tarefa:
+            if mutex.tarefaDona == tarefa:
                 mutexes_possuidos.append(mutex.id)
 
         if len(mutexes_possuidos) > 0:
@@ -381,14 +381,14 @@ class SimuladorEngine:
 
         tarefa.eventosExecutados.add(evento.ordem)
 
-        if mutex.dono == tarefa:
+        if mutex.tarefaDona == tarefa:
             raise ValueError(
                 f"Tarefa T{tarefa.id} tentou travar novamente o mutex {evento.mutex_id}, "
                 "mas ela já é a dona desse mutex."
             )
 
-        if mutex.dono is None:
-            mutex.dono = tarefa
+        if mutex.tarefaDona is None:
+            mutex.tarefaDona = tarefa
             self.registrar_evento_mutex(tarefa, evento, bloqueou=False)
             return False
 
@@ -396,7 +396,7 @@ class SimuladorEngine:
             mutex.fila_espera.append(tarefa)
 
         tarefa.motivoBloqueio = "MUTEX"
-        tarefa.mutexBloqueado = evento.mutex_id
+        tarefa.idMutexAtual = evento.mutex_id
 
         self.estado_atual.suspender_tarefa(tarefa)
         self.registrar_evento_mutex(tarefa, evento, bloqueou=True)
@@ -409,23 +409,23 @@ class SimuladorEngine:
 
         tarefa.eventosExecutados.add(evento.ordem)
 
-        if mutex.dono != tarefa:
+        if mutex.tarefaDona != tarefa:
             raise ValueError(
                 f"Tarefa T{tarefa.id} tentou liberar o mutex {evento.mutex_id}, "
                 "mas ela não é a dona desse mutex."
             )
 
         if len(mutex.fila_espera) == 0:
-            mutex.dono = None
+            mutex.tarefaDona = None
             self.registrar_evento_mutex(tarefa, evento, acordou=False)
             return False
 
         proxima_tarefa = mutex.fila_espera.pop(0)
 
-        mutex.dono = proxima_tarefa
+        mutex.tarefaDona = proxima_tarefa
 
         proxima_tarefa.motivoBloqueio = ""
-        proxima_tarefa.mutexBloqueado = None
+        proxima_tarefa.idMutexAtual = None
 
         self.estado_atual.acordar_tarefa(proxima_tarefa)
         self.registrar_evento_mutex(
@@ -497,7 +497,7 @@ class SimuladorEngine:
             )
 
         tarefa.motivoBloqueio = "IO"
-        tarefa.mutexBloqueado = None
+        tarefa.idMutexAtual = None
         tarefa.ioTempoTermina = self.estado_atual.relogio_global + evento.duracao
 
         self.registrar_evento_io(tarefa, evento)

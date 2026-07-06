@@ -34,5 +34,5 @@ class TCB:
     tempoEspera: int = 0 # Tempo que a tarefa passou na fila de prontos
     eventosExecutados: set[int] = field(default_factory=set) # Para não ficar executando o mutex
     motivoBloqueio: str = "" # Mutex ou IO
-    mutexBloqueado: int | None = None # Id do mutex que bloqueou a tarefa
+    idMutexAtual: int | None = None # Id do mutex que bloqueou a tarefa
     ioTempoTermina: int | None = None # Tick global em que a operação de E/S termina e gera IRQ
