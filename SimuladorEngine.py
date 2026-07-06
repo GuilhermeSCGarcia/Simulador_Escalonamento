@@ -143,6 +143,8 @@ class SimuladorEngine:
                 p.estado = EstadosCPU.DESLIGADO
             return
 
+        self.aplicar_envelhecimento_escalonamento(candidatos, [t_escolhida])
+
         # Se alguma tarefa for escolhida, começa o processo de escolonamento na cpu
         p.estado = EstadosCPU.LIGADO # a cpu é ligada para receber a tarefa escolhida
 
@@ -185,6 +187,8 @@ class SimuladorEngine:
             if p.atualTarefa is not None:
                 candidatos.append(p.atualTarefa)
 
+        candidatos_originais = copy.copy(candidatos)
+
         # Verifica se a tarefa já estava executando na cpu
         for tarefa in candidatos:
             tarefa.estavaRodando = tarefa.idCpu != -1
@@ -197,6 +201,7 @@ class SimuladorEngine:
                 escolhidos.append(t_escolhida)
                 candidatos.remove(t_escolhida)
 
+        self.aplicar_envelhecimento_escalonamento(candidatos_originais, escolhidos)
 
         # 1) Mantém as tarefas já executando que continuam escolhidas.
         # 2) Para CPUs que precisam trocar (ou estão ociosas), realoca e preenche com o que sobrar em `escolhidos`.
@@ -244,7 +249,6 @@ class SimuladorEngine:
     # Método que controla o fluxo de avançar o tempo do sistema
     def avancar_tick(self) -> None: 
         self.resetarMarcadorRandomico()
-        self.atualizar_tempo_espera()
         self.processarTempoCPU()
         self.processar_cpus()
         self.estado_atual.relogio_global = self.estado_atual.relogio_global + 1
@@ -313,13 +317,17 @@ class SimuladorEngine:
         self.estado_atual = self.estado_zero.clonar_estado()
         self.historico_estados = [self.estado_atual.clonar_estado()] #Restaura o estado zero diretamente da engine, para garantir que tudo volte ao início corretamente
 
-    def atualizar_tempo_espera(self) -> None:
-        for tarefa in self.estado_atual.fila_prontos:
-            tarefa.tempoEspera += 1
+    def aplicar_envelhecimento_escalonamento(self, candidatos: list[TCB], escolhidos: list[TCB]) -> None:
+        if self.config.algoritmoEscalomento.upper() != "PRIOPENV":
+            return
 
-        for cpu in self.estado_atual.cpus:
-            if cpu.atualTarefa is not None:
-                cpu.atualTarefa.tempoEspera = 0
+        ids_escolhidos = {tarefa.id for tarefa in escolhidos}
+
+        for tarefa in candidatos:
+            if tarefa.id in ids_escolhidos:
+                tarefa.tempoEspera = 0
+            else:
+                tarefa.tempoEspera += 1
 
     def tempo_executado_tarefa(self, tarefa: TCB) -> int:
         return tarefa.tempoTotal - tarefa.tempoCorrido

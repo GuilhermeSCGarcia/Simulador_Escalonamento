@@ -31,7 +31,7 @@ class TCB:
     estavaRodando: bool = False # Atributo para desempate no escalonamento
     sofreu_sorteio: bool = False # Atributo para determinar se a tarefa foi escolhida com base no sorteio
     quatum_dado: int = 0
-    tempoEspera: int = 0 # Tempo que a tarefa passou na fila de prontos
+    tempoEspera: int = 0 # Contador de envelhecimento: quantas decisões de escalonamento a tarefa aguardou
     eventosExecutados: set[int] = field(default_factory=set) # Para não ficar executando o mutex
     motivoBloqueio: str = "" # Mutex ou IO
     idMutexAtual: int | None = None # Id do mutex que bloqueou a tarefa
